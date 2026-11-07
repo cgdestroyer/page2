@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Email Signature Editor</title>
+<style>
+  :root {
+    --bg: #0f1221;
+    --panel: #171a2b;
+    --panel-2: #1f2338;
+    --border: #2b3050;
+    --text: #e7e9f3;
+    --muted: #9aa0bd;
+    --accent: #6c8cff;
+    --accent-2: #4f6fe0;
+    --good: #35c08a;
+    --danger: #e0635a;
+    --radius: 10px;
+    --shadow: 0 6px 24px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 14px 20px;
+    background: linear-gradient(180deg, #1a1e33, #141728);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 10;
+  }
+  header h1 { font-size: 16px; margin: 0; letter-spacing: .3px; font-weight: 650; }
+  header .sub { color: var(--muted); font-size: 12px; margin-left: 10px; }
+  .layout {
+    display: grid;
+    grid-template-columns: 420px 1fr;
+    min-height: calc(100vh - 56px);
+  }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+  .editor { border-right: 1px solid var(--border); padding: 18px; overflow-y: auto; }
+  .preview-wrap { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .tab {
+    background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+    padding: 7px 12px; border-radius: 999px; font-size: 12.5px; cursor: pointer; user-select: none;
+  }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .section { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; }
+  .section h2 { margin: 0 0 12px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; font-weight: 650; }
+
+  .field { margin-bottom: 11px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .row { display: flex; gap: 10px; }
+  .row > .field { flex: 1; }
+  input[type="text"], input[type="url"], input[type="email"], input[type="number"], select, textarea {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 9px 10px; font-size: 13px; font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,140,255,.2); }
+  input[type="color"] { width: 42px; height: 36px; padding: 2px; border: 1px solid var(--border); background: var(--panel-2); border-radius: 8px; cursor: pointer; }
+  .color-row { display: flex; align-items: center; gap: 8px; }
+  .color-row input[type="text"] { flex: 1; }
+  textarea { min-height: 120px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.5; }
+
+  .btn {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 9px 14px; font-size: 13px; cursor: pointer; font-weight: 600;
+  }
+  .btn:hover { background: var(--accent-2); }
+  .btn.secondary { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); font-weight: 500; }
+  .btn.secondary:hover { border-color: var(--accent); }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .btn.small { padding: 6px 10px; font-size: 12px; }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .links-list { display: flex; flex-direction: column; gap: 8px; }
+  .link-item { display: flex; gap: 8px; align-items: center; }
+  .link-item select { flex: 0 0 120px; }
+  .link-item input { flex: 1; }
+  .link-item .remove { flex: 0 0 auto; background: transparent; border: 1px solid var(--border); color: var(--danger); border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 16px; }
+
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .device-toggle { display: flex; gap: 6px; }
+  .pill { font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+  .pill.active { color: #fff; border-color: var(--accent); background: var(--accent); }
+
+  .preview-frame {
+    background: #ffffff; border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 28px; overflow: auto; flex: 1; min-height: 240px; transition: max-width .2s ease; width: 100%;
+  }
+  .preview-frame.mobile { max-width: 380px; }
+
+  .code-box { position: relative; }
+  .code-box textarea { min-height: 220px; }
+  .hint { font-size: 11.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--good); color: #04281b; padding: 10px 18px; border-radius: 999px;
+    font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: all .25s ease; z-index: 50;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; }
+  .checkbox-row input { width: auto; }
+  .img-preview { margin-top: 8px; }
+  .img-preview img { max-height: 70px; border-radius: 6px; border: 1px solid var(--border); background: #fff; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+  .template-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .template-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; cursor: pointer; font-size: 12px; text-align: center; }
+  .template-card:hover { border-color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>✉️ Email Signature Editor <span class="sub">table-based HTML · inline styles · paste-ready</span></h1>
+  </div>
+  <div class="btn-row">
+    <button class="btn secondary small" id="btnReset">Reset</button>
+    <button class="btn small" id="btnCopyTop">Copy signature</button>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- ======================= EDITOR ======================= -->
+  <div class="editor">
+    <div class="tabs">
+      <div class="tab active" data-tab="details">Details</div>
+      <div class="tab" data-tab="style">Style</div>
+      <div class="tab" data-tab="links">Links</div>
+      <div class="tab" data-tab="code">HTML</div>
+    </div>
+
+    <!-- DETAILS -->
+    <div class="tab-pane active" data-pane="details">
+      <div class="section">
+        <h2>Templates</h2>
+        <div class="template-grid">
+          <div class="template-card" data-template="classic">Classic (photo left)</div>
+          <div class="template-card" data-template="stacked">Stacked (no photo)</div>
+          <div class="template-card" data-template="divider">Vertical divider</div>
+          <div class="template-card" data-template="logo">Logo + accent bar</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Person</h2>
+        <div class="field"><label>Full name</label><input type="text" data-field="name" /></div>
+        <div class="field"><label>Job title</label><input type="text" data-field="title" /></div>
+        <div class="field"><label>Company</label><input type="text" data-field="company" /></div>
+        <div class="field"><label>Tagline / department (optional)</label><input type="text" data-field="tagline" /></div>
+      </div>
+
+      <div class="section">
+        <h2>Contact</h2>
+        <div class="row">
+          <div class="field"><label>Phone</label><input type="text" data-field="phone" /></div>
+          <div class="field"><label>Mobile</label><input type="text" data-field="mobile" /></div>
+        </div>
+        <div class="field"><label>Email</label><input type="email" data-field="email" /></div>
+        <div class="field"><label>Website</label><input type="url" data-field="website" /></div>
+        <div class="field"><label>Address (optional)</label><input type="text" data-field="address" /></div>
+      </div>
+
+      <div class="section">
+        <h2>Image</h2>
+        <div class="field">
+          <label>Image URL (photo or logo)</label>
+          <input type="url" data-field="imageUrl" placeholder="https://… (use a hosted URL for email)" />
+        </div>
+        <div class="field">
+          <label>Or upload (embeds as data URI — see note)</label>
+          <input type="file" id="imageUpload" accept="image/*" />
+        </div>
+        <div class="row">
+          <div class="field"><label>Width (px)</label><input type="number" data-field="imageWidth" min="20" max="400" /></div>
+          <div class="field">
+            <label>Shape</label>
+            <select data-field="imageShape">
+              <option value="square">Square</option>
+              <option value="round">Rounded</option>
+              <option value="circle">Circle</option>
+            </select>
+          </div>
+        </div>
+        <div class="img-preview" id="imgPreview"></div>
+        <p class="hint">⚠️ Uploaded images embed as base64 data URIs. Many email clients (esp. Outlook & Gmail) block these. For reliable delivery, host the image and paste its public URL.</p>
+      </div>
+    </div>
+
+    <!-- STYLE -->
+    <div class="tab-pane" data-pane="style">
+      <div class="section">
+        <h2>Typography</h2>
+        <div class="field">
+          <label>Font family</label>
+          <select data-field="fontFamily">
+            <option value="Arial, Helvetica, sans-serif">Arial</option>
+            <option value="Helvetica, Arial, sans-serif">Helvetica</option>
+            <option value="Georgia, 'Times New Roman', serif">Georgia</option>
+            <option value="'Trebuchet MS', Verdana, sans-serif">Trebuchet MS</option>
+            <option value="Verdana, Geneva, sans-serif">Verdana</option>
+            <option value="Tahoma, Verdana, sans-serif">Tahoma</option>
+            <option value="'Courier New', Courier, monospace">Courier New</option>
+          </select>
+        </div>
+        <div class="row">
+          <div class="field"><label>Base size (px)</label><input type="number" data-field="fontSize" min="10" max="20" /></div>
+          <div class="field"><label>Name size (px)</label><input type="number" data-field="nameSize" min="12" max="30" /></div>
+        </div>
+      </div>
+      <div class="section">
+        <h2>Colors</h2>
+        <div class="field"><label>Text</label><div class="color-row"><input type="color" data-color="textColor" /><input type="text" data-field="textColor" /></div></div>
+        <div class="field"><label>Name</label><div class="color-row"><input type="color" data-color="nameColor" /><input type="text" data-field="nameColor" /></div></div>
+        <div class="field"><label>Accent (links, divider, bar)</label><div class="color-row"><input type="color" data-color="accentColor" /><input type="text" data-field="accentColor" /></div></div>
+        <div class="field"><label>Muted (title, labels)</label><div class="color-row"><input type="color" data-color="mutedColor" /><input type="text" data-field="mutedColor" /></div></div>
+      </div>
+      <div class="section">
+        <h2>Options</h2>
+        <div class="field checkbox-row"><input type="checkbox" data-field="showLabels" /><label style="margin:0;">Show field labels (P: / M: / E:)</label></div>
+        <div class="field checkbox-row"><input type="checkbox" data-field="showDivider" /><label style="margin:0;">Show divider line above signature</label></div>
+        <div class="field"><label>Spacing between rows (px)</label><input type="number" data-field="rowSpacing" min="0" max="12" /></div>
+      </div>
+    </div>
+
+    <!-- LINKS -->
+    <div class="tab-pane" data-pane="links">
+      <div class="section">
+        <h2>Social & custom links</h2>
+        <div class="links-list" id="linksList"></div>
+        <div style="margin-top:12px;"><button class="btn secondary small" id="btnAddLink">+ Add link</button></div>
+        <p class="hint">Icons use hosted SVG badges. Choose a type or pick "Custom" for a text link.</p>
+      </div>
+    </div>
+
+    <!-- CODE -->
+    <div class="tab-pane" data-pane="code">
+      <div class="section">
+        <h2>Raw HTML (editable)</h2>
+        <div class="code-box">
+          <textarea id="codeArea" spellcheck="false"></textarea>
+        </div>
+        <div class="btn-row" style="margin-top:10px;">
+          <button class="btn secondary small" id="btnApplyCode">Apply HTML → preview</button>
+          <button class="btn ghost small" id="btnRegen">Regenerate from form</button>
+        </div>
+        <p class="hint">Edit the HTML directly for full control (add tables, cells, etc.). "Apply" renders your edits in the preview. "Regenerate" rebuilds from the form fields (discards manual edits).</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================= PREVIEW ======================= -->
+  <div class="preview-wrap">
+    <div class="toolbar">
+      <div class="device-toggle">
+        <span class="pill active" data-device="desktop">🖥 Desktop</span>
+        <span class="pill" data-device="mobile">📱 Mobile</span>
+      </div>
+      <span class="pill" id="bgToggle" data-bg="light">◻️ Light bg</span>
+      <div style="flex:1;"></div>
+      <button class="btn secondary small" id="btnCopyHtml">Copy HTML</button>
+      <button class="btn secondary small" id="btnDownload">Download .html</button>
+      <button class="btn small" id="btnCopy">Copy signature (rich)</button>
+    </div>
+    <div class="preview-frame" id="previewFrame">
+      <div id="previewContent"></div>
+    </div>
+    <p class="hint">
+      <b>How to use it:</b> Click <b>Copy signature (rich)</b>, then paste into Gmail Settings → Signature, Outlook → Signatures,
+      or Apple Mail. Use <b>Copy HTML</b> if your client has a "paste HTML / source" option.
+    </p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Default state ----------
+  const DEFAULT = {
+    template: "classic",
+    name: "Jordan Rivera",
+    title: "Senior Product Designer",
+    company: "Northwind Studio",
+    tagline: "Design & Brand",
+    phone: "+1 (555) 123-4567",
+    mobile: "",
+    email: "jordan@northwind.studio",
+    website: "www.northwind.studio",
+    address: "123 Market St, Suite 400, San Francisco, CA",
+    imageUrl: "https://i.pravatar.cc/200?img=12",
+    imageWidth: 90,
+    imageShape: "circle",
+    fontFamily: "Arial, Helvetica, sans-serif",
+    fontSize: 13,
+    nameSize: 18,
+    textColor: "#333333",
+    nameColor: "#1a1a2e",
+    accentColor: "#6c8cff",
+    mutedColor: "#777777",
+    showLabels: false,
+    showDivider: true,
+    rowSpacing: 3,
+    links: [
+      { type: "linkedin", url: "https://linkedin.com/in/jordanrivera" },
+      { type: "twitter", url: "https://twitter.com/jordanr" }
+    ]
+  };
+
+  const STORAGE_KEY = "sig-editor-state-v1";
+  let state = load();
+  let manualHtml = null; // when user edits raw HTML
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) return Object.assign({}, DEFAULT, JSON.parse(raw));
+    } catch (e) {}
+    return JSON.parse(JSON.stringify(DEFAULT));
+  }
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+  }
+
+  // ---------- Helpers ----------
+  const $ = (sel, root) => (root || document).querySelector(sel);
+  const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+  function normUrl(u) {
+    if (!u) return "";
+    if (/^https?:\/\//i.test(u) || /^mailto:/i.test(u) || /^tel:/i.test(u)) return u;
+    return "https://" + u;
+  }
+
+  // Social icon badges (hosted, reliable for email)
+  const ICONS = {
+    linkedin: "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/linkedin.svg",
+    twitter:  "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/twitter.svg",
+    github:   "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons@latest/icons/github.svg",
+    instagram:"https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/instagram.svg",
+    facebook: "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/facebook.svg",
+    youtube:  "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/youtube.svg"
+  };
+  const LINK_TYPES = ["linkedin","twitter","github","instagram","facebook","youtube","custom"];
+  const LINK_LABELS = { linkedin:"LinkedIn", twitter:"Twitter/X", github:"GitHub", instagram:"Instagram", facebook:"Facebook", youtube:"YouTube", custom:"Custom" };
+
+  // ---------- HTML generation (table-based, inline styles) ----------
+  function radius(shape, w) {
+    if (shape === "circle") return Math.round(w / 2);
+    if (shape === "round") return 10;
+    return 0;
+  }
+
+  function contactLine(label, value, href) {
+    if (!value) return "";
+    const lbl = state.showLabels && label ? '<span style="color:' + state.mutedColor + ';">' + label + ' </span>' : "";
+    const inner = href
+      ? '<a href="' + esc(href) + '" style="color:' + state.textColor + '; text-decoration:none;">' + esc(value) + '</a>'
+      : esc(value);
+    return '<tr><td style="padding:' + state.rowSpacing + 'px 0; font-family:' + state.fontFamily +
+      '; font-size:' + state.fontSize + 'px; color:' + state.textColor + '; line-height:1.4;">' +
+      lbl + inner + '</td></tr>';
+  }
+
+  function socialRow() {
+    const links = (state.links || []).filter(l => l.url);
+    if (!links.length) return "";
+    let cells = "";
+    links.forEach(l => {
+      const url = normUrl(l.url);
+      if (l.type === "custom") {
+        cells += '<td style="padding:0 10px 0 0; font-family:' + state.fontFamily + '; font-size:' + state.fontSize +
+          'px;"><a href="' + esc(url) + '" style="color:' + state.accentColor + '; text-decoration:none;">' +
+          esc(l.label || url.replace(/^https?:\/\//, "")) + '</a></td>';
+      } else {
+        const icon = ICONS[l.type] || ICONS.linkedin;
+        cells += '<td style="padding:0 8px 0 0;"><a href="' + esc(url) + '"><img src="' + esc(icon) +
+          '" width="22" height="22" alt="' + esc(LINK_LABELS[l.type] || l.type) +
+          '" style="display:block; border:0;" /></a></td>';
+      }
+    });
+    return '<tr><td style="padding-top:10px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation"><tr>' +
+      cells + '</tr></table></td></tr>';
+  }
+
+  function infoBlock() {
+    let html = "";
+    // Name
+    html += '<tr><td style="padding:0 0 2px; font-family:' + state.fontFamily + '; font-size:' + state.nameSize +
+      'px; font-weight:bold; color:' + state.nameColor + '; line-height:1.2;">' + esc(state.name) + '</td></tr>';
+    // Title + company
+    const tc = [state.title, state.company].filter(Boolean)
+      .map(esc).join(' <span style="color:' + state.accentColor + ';">·</span> ');
+    if (tc) {
+      html += '<tr><td style="padding:0 0 2px; font-family:' + state.fontFamily + '; font-size:' + state.fontSize +
+        'px; color:' + state.mutedColor + '; line-height:1.3;">' + tc + '</td></tr>';
+    }
+    if (state.tagline) {
+      html += '<tr><td style="padding:0 0 6px; font-family:' + state.fontFamily + '; font-size:' + (state.fontSize - 1) +
+        'px; color:' + state.mutedColor + '; line-height:1.3;">' + esc(state.tagline) + '</td></tr>';
+    }
+    // spacer
+    html += '<tr><td style="font-size:0; line-height:0; height:6px;">&nbsp;</td></tr>';
+    // contacts
+    html += contactLine("P:", state.phone, "tel:" + String(state.phone).replace(/[^+\d]/g, ""));
+    html += contactLine("M:", state.mobile, "tel:" + String(state.mobile).replace(/[^+\d]/g, ""));
+    html += contactLine("E:", state.email, "mailto:" + state.email);
+    html += contactLine("W:", state.website, normUrl(state.website));
+    html += contactLine("", state.address, null);
+    html += socialRow();
+    return html;
+  }
+
+  function imageCell(extraStyle) {
+    if (!state.imageUrl) return "";
+    const w = state.imageWidth;
+    const r = radius(state.imageShape, w);
+    return '<td style="vertical-align:top; padding-right:18px; ' + (extraStyle || "") + '">' +
+      '<img src="' + esc(state.imageUrl) + '" width="' + w + '" alt="' + esc(state.name) +
+      '" style="display:block; border:0; width:' + w + 'px; border-radius:' + r + 'px;" /></td>';
+  }
+
+  function dividerRow() {
+    if (!state.showDivider) return "";
+    return '<tr><td colspan="3" style="padding-bottom:12px;"><table cellpadding="0" cellspacing="0" border="0" width="100%" role="presentation"><tr>' +
+      '<td style="border-top:1px solid ' + state.accentColor + '33; font-size:0; line-height:0;">&nbsp;</td></tr></table></td></tr>';
+  }
+
+  function generate() {
+    const t = state.template;
+    let inner = "";
+
+    if (t === "classic") {
+      inner =
+        '<tr>' + imageCell() +
+        '<td style="vertical-align:top;"><table cellpadding="0" cellspacing="0" border="0" role="presentation">' +
+        infoBlock() + '</table></td></tr>';
+    } else if (t === "stacked") {
+      inner = '<tr><td style="vertical-align:top;"><table cellpadding="0" cellspacing="0" border="0" role="presentation">' +
+        infoBlock() + '</table></td></tr>';
+    } else if (t === "divider") {
+      inner = '<tr>' + imageCell() +
+        '<td style="vertical-align:top; padding-right:18px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation">' +
+        '<tr><td style="width:2px; background:' + state.accentColor + '; font-size:0; line-height:0;" height="100%">&nbsp;</td></tr>' +
+        '</table></td>' +
+        '<td style="vertical-align:top;"><table cellpadding="0" cellspacing="0" border="0" role="presentation">' +
+        infoBlock() + '</table></td></tr>';
+    } else if (t === "logo") {
+      inner =
+        '<tr><td colspan="2" style="padding-bottom:10px;">' +
+        '<table cellpadding="0" cellspacing="0" border="0" width="100%" role="presentation"><tr>' +
+        '<td style="width:4px; background:' + state.accentColor + '; font-size:0;">&nbsp;</td>' +
+        '<td style="padding-left:12px; vertical-align:middle;">' +
+        (state.imageUrl ? '<img src="' + esc(state.imageUrl) + '" width="' + state.imageWidth +
+          '" alt="' + esc(state.company) + '" style="display:block; border:0; border-radius:' +
+          radius(state.imageShape, state.imageWidth) + 'px;" />' : "") +
+        '</td></tr></table></td></tr>' +
+        '<tr><td colspan="2"><table cellpadding="0" cellspacing="0" border="0" role="presentation">' +
+        infoBlock() + '</table></td></tr>';
+    }
+
+    const html =
+      '<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;">' +
+      dividerRow() + inner + '</table>';
+
+    return html;
+  }
+
+  function currentHtml() {
+    return manualHtml != null ? manualHtml : generate();
+  }
+
+  // ---------- Render ----------
+  function render() {
+    const html = currentHtml();
+    $("#previewContent").innerHTML = html;
+    if (manualHtml == null) $("#codeArea").value = formatHtml(html);
+    renderImgPreview();
+  }
+
+  function formatHtml(html) {
+    // light pretty-print for readability
+    return html
+      .replace(/></g, ">\n<")
+      .replace(/(<table[^>]*>)/g, "\n$1")
+      .trim();
+  }
+
+  function renderImgPreview() {
+    const box = $("#imgPreview");
+    box.innerHTML = state.imageUrl
+      ? '<img src="' + esc(state.imageUrl) + '" alt="preview" />'
+      : '<span class="hint">No image set.</span>';
+  }
+
+  // ---------- Bind form -> state ----------
+  function syncFormFromState() {
+    $$("[data-field]").forEach(el => {
+      const key = el.getAttribute("data-field");
+      if (!(key in state)) return;
+      if (el.type === "checkbox") el.checked = !!state[key];
+      else el.value = state[key];
+    });
+    $$("[data-color]").forEach(el => { el.value = state[el.getAttribute("data-color")]; });
+    renderLinks();
+  }
+
+  function onFieldInput(e) {
+    const el = e.target;
+    const key = el.getAttribute("data-field");
+    if (!key) return;
+    if (el.type === "checkbox") state[key] = el.checked;
+    else if (el.type === "number") state[key] = Number(el.value);
+    else state[key] = el.value;
+    // keep paired color text/input in sync
+    if (el.hasAttribute("data-field")) {
+      const colorInput = $('[data-color="' + key + '"]');
+      if (colorInput && /^#?[0-9a-fA-F]{3,6}$/.test(el.value)) colorInput.value = el.value.startsWith("#") ? el.value : "#" + el.value;
+    }
+    manualHtml = null; // form edits override manual html
+    save(); render();
+  }
+
+  function onColorInput(e) {
+    const key = e.target.getAttribute("data-color");
+    state[key] = e.target.value;
+    const txt = $('[data-field="' + key + '"]');
+    if (txt) txt.value = e.target.value;
+    manualHtml = null; save(); render();
+  }
+
+  // ---------- Links UI ----------
+  function renderLinks() {
+    const list = $("#linksList");
+    list.innerHTML = "";
+    (state.links || []).forEach((link, i) => {
+      const row = document.createElement("div");
+      row.className = "link-item";
+      const sel = document.createElement("select");
+      LINK_TYPES.forEach(tp => {
+        const o = document.createElement("option");
+        o.value = tp; o.textContent = LINK_LABELS[tp];
+        if (tp === link.type) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener("change", () => { link.type = sel.value; save(); render(); });
+
+      const url = document.createElement("input");
+      url.type = "text";
+      url.placeholder = link.type === "custom" ? "https://… (label:url optional)" : "Profile URL";
+      url.value = link.url || "";
+      url.addEventListener("input", () => { link.url = url.value; save(); render(); });
+
+      const rm = document.createElement("button");
+      rm.className = "remove"; rm.textContent = "×"; rm.title = "Remove";
+      rm.addEventListener("click", () => { state.links.splice(i, 1); save(); renderLinks(); render(); });
+
+      row.appendChild(sel); row.appendChild(url); row.appendChild(rm);
+      list.appendChild(row);
+    });
+  }
+
+  // ---------- Copy / export ----------
+  function showToast(msg, bad) {
+    const t = $("#toast");
+    t.textContent = msg;
+    t.style.background = bad ? "var(--danger)" : "var(--good)";
+    t.style.color = bad ? "#fff" : "#04281b";
+    t.classList.add("show");
+    setTimeout(() => t.classList.remove("show"), 1800);
+  }
+
+  async function copyRich() {
+    const html = currentHtml();
+    try {
+      if (navigator.clipboard && window.ClipboardItem) {
+        const item = new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([plainText()], { type: "text/plain" })
+        });
+        await navigator.clipboard.write([item]);
+        showToast("Signature copied — paste into your email client");
+        return;
+      }
+    } catch (e) {}
+    // Fallback: select a rendered node and execCommand copy
+    const tmp = document.createElement("div");
+    tmp.style.position = "fixed"; tmp.style.left = "-9999px";
+    tmp.innerHTML = html;
+    document.body.appendChild(tmp);
+    const range = document.createRange();
+    range.selectNode(tmp);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+    try {
+      document.execCommand("copy");
+      showToast("Signature copied — paste into your email client");
+    } catch (e) {
+      showToast("Copy failed — use 'Copy HTML' instead", true);
+    }
+    sel.removeAllRanges();
+    document.body.removeChild(tmp);
+  }
+
+  function plainText() {
+    return [state.name, state.title, state.company, state.phone, state.mobile, state.email, state.website, state.address]
+      .filter(Boolean).join("\n");
+  }
+
+  async function copyHtml() {
+    const html = currentHtml();
+    try {
+      await navigator.clipboard.writeText(html);
+      showToast("HTML source copied");
+    } catch (e) {
+      $("#codeArea").focus(); $("#codeArea").select();
+      showToast("Select-all + copy from the HTML tab", true);
+    }
+  }
+
+  function download() {
+    const doc = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>' + currentHtml() + '</body></html>';
+    const blob = new Blob([doc], { type: "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "email-signature.html";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast("Downloaded email-signature.html");
+  }
+
+  // ---------- Templates ----------
+  const TEMPLATE_DEFAULTS = {
+    classic:  { imageShape: "circle",  showDivider: true  },
+    stacked:  { imageShape: "square",  showDivider: true  },
+    divider:  { imageShape: "round",   showDivider: false },
+    logo:     { imageShape: "square",  showDivider: false }
+  };
+
+  function applyTemplate(name) {
+    state.template = name;
+    Object.assign(state, TEMPLATE_DEFAULTS[name] || {});
+    manualHtml = null;
+    save(); syncFormFromState(); render();
+    showToast("Template applied: " + name);
+  }
+
+  // ---------- Tabs ----------
+  function setupTabs() {
+    $$(".tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        $$(".tab").forEach(t => t.classList.remove("active"));
+        $$(".tab-pane").forEach(p => p.classList.remove("active"));
+        tab.classList.add("active");
+        $('[data-pane="' + tab.getAttribute("data-tab") + '"]').classList.add("active");
+      });
+    });
+  }
+
+  // ---------- Events ----------
+  function setup() {
+    syncFormFromState();
+    setupTabs();
+    render();
+
+    document.addEventListener("input", e => {
+      if (e.target.matches("[data-field]")) onFieldInput(e);
+      else if (e.target.matches("[data-color]")) onColorInput(e);
+    });
+
+    $("#btnAddLink").addEventListener("click", () => {
+      state.links = state.links || [];
+      state.links.push({ type: "linkedin", url: "" });
+      save(); renderLinks(); render();
+    });
+
+    $$(".template-card").forEach(c =>
+      c.addEventListener("click", () => applyTemplate(c.getAttribute("data-template"))));
+
+    $("#imageUpload").addEventListener("change", e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        state.imageUrl = reader.result;
+        $('[data-field="imageUrl"]').value = "(embedded upload)";
+        manualHtml = null; save(); render();
+        showToast("Image embedded — remember hosting is more reliable");
+      };
+      reader.readAsDataURL(file);
+    });
+
+    $("#btnApplyCode").addEventListener("click", () => {
+      manualHtml = $("#codeArea").value;
+      render();
+      $("#previewContent").innerHTML = manualHtml; // honor manual edits exactly
+      showToast("Applied custom HTML");
+    });
+    $("#btnRegen").addEventListener("click", () => {
+      manualHtml = null; render(); showToast("Regenerated from form");
+    });
+
+    $("#btnCopy").addEventListener("click", copyRich);
+    $("#btnCopyTop").addEventListener("click", copyRich);
+    $("#btnCopyHtml").addEventListener("click", copyHtml);
+    $("#btnDownload").addEventListener("click", download);
+
+    $("#btnReset").addEventListener("click", () => {
+      if (!confirm("Reset everything to defaults?")) return;
+      state = JSON.parse(JSON.stringify(DEFAULT));
+      manualHtml = null; save(); syncFormFromState(); render();
+      showToast("Reset to defaults");
+    });
+
+    $$(".pill[data-device]").forEach(p => p.addEventListener("click", () => {
+      $$(".pill[data-device]").forEach(x => x.classList.remove("active"));
+      p.classList.add("active");
+      $("#previewFrame").classList.toggle("mobile", p.getAttribute("data-device") === "mobile");
+    }));
+
+    $("#bgToggle").addEventListener("click", () => {
+      const frame = $("#previewFrame");
+      const dark = frame.style.background === "rgb(45, 45, 60)";
+      frame.style.background = dark ? "#ffffff" : "#2d2d3c";
+      $("#bgToggle").textContent = dark ? "◻️ Light bg" : "◼️ Dark bg";
+    });
+  }
+
+  document.addEventListener("DOMContentLoaded", setup);
+})();
+</script>
+</body>
+</html>
