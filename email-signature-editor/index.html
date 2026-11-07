@@ -371,6 +371,10 @@
   .rv-boxlabel.show { display: block; }
   .rv-boxlabel.ok { background: var(--good); color: #042a1c; }
   .rv-boxlabel.warn { background: var(--warn); color: #3a2a04; }
+  /* "show all labels" overlay in review preview */
+  .rv-alllabel { position: absolute; z-index: 6; font-size: 10px; font-weight: 700; line-height: 1.4; padding: 1px 6px; border-radius: 4px; background: var(--good); color: #042a1c; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+  .rv-alllabel.tiny { font-size: 8px; padding: 0 3px; border-radius: 3px; opacity: .92; }
+  .rv-alloutline { outline: 1.5px solid rgba(53,192,138,.6) !important; outline-offset: 1px; }
   .rv-filter { display: flex; gap: 6px; margin-top: 10px; }
   .rv-chip { font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; cursor: pointer; user-select: none; }
   .rv-chip:hover { color: var(--text); }
@@ -2265,7 +2269,28 @@ function normalizeTagsInPlace(){
 /* ================================================================
    CONNECTION REVIEW modal (side-by-side)
    ================================================================ */
-let reviewFilter="all"; let reviewConnectKey=null;
+let reviewFilter="all"; let reviewConnectKey=null; let showAllLabels=false;
+
+/* draw a persistent small label on EVERY connected element in the review preview */
+function clearReviewAllLabels(){ const prev=$("#rvPreview"); if(prev){ $$(".rv-alllabel",prev).forEach(n=>n.remove()); $$(".rv-alloutline",prev).forEach(n=>n.classList.remove("rv-alloutline")); } }
+function paintReviewAllLabels(){
+  const prev=$("#rvPreview"); if(!prev) return;
+  clearReviewAllLabels();
+  const pr=prev.getBoundingClientRect();
+  $$("[data-sig-role]",prev).forEach(node=>{
+    const role=node.getAttribute("data-sig-role");
+    const def=ROLE_BY_KEY[role] || (state.customFields||[]).find(f=>f.key===role) ||
+      (/__icon$/.test(role) && {label:(ROLE_BY_KEY[role.replace(/__icon$/,"")]||{}).label ? (ROLE_BY_KEY[role.replace(/__icon$/,"")].label+" icon") : role});
+    if(!def) return;
+    node.classList.add("rv-alloutline");           // outline the element lightly
+    const tr=node.getBoundingClientRect();
+    const isIcon=/__icon$/.test(role) || (node.tagName==="IMG" && tr.width && tr.width<=40);
+    const lbl=el("div",{class:"rv-alllabel"+(isIcon?" tiny":"")}, (def.label||role));
+    lbl.style.left=Math.max(0,(tr.left-pr.left+prev.scrollLeft))+"px";
+    lbl.style.top=Math.max(0,(tr.top-pr.top+prev.scrollTop-13))+"px";
+    prev.appendChild(lbl);
+  });
+}
 function openReviewModal(){
   const defs=allFieldDefs();
   setModal("Connection review", `
@@ -2278,7 +2303,7 @@ function openReviewModal(){
     <div class="review-grid" style="margin-top:10px;">
       <div class="review-col"><h4>Fields</h4><div class="review-fields" id="rvFields"></div>
         <h4 style="margin-top:14px;">Social links</h4><div id="rvSocials"></div></div>
-      <div class="review-col"><h4>Design</h4><div class="review-preview" id="rvPreview"></div></div>
+      <div class="review-col"><h4 style="display:flex;align-items:center;gap:8px;">Design <span class="rv-chip" id="rvShowAll" style="margin-left:auto;">🏷 Show all labels</span></h4><div class="review-preview" id="rvPreview"></div></div>
     </div>
   `, [ {label:"Normalize now", cls:"ghost", act:()=>{ normalizeInPlace(); closeModal(); }}, {label:"Done", cls:"", act:closeModal} ]);
   const prev=$("#rvPreview"); prev.innerHTML=cleanExportButKeepRoles();
@@ -2286,6 +2311,10 @@ function openReviewModal(){
   prev.appendChild(el("div",{class:"rv-boxlabel",id:"rvBoxLabel"}));
   renderReviewFields();
   renderReviewSocials();
+  if(showAllLabels){ $("#rvShowAll").classList.add("active"); paintReviewAllLabels(); }
+  $("#rvShowAll").addEventListener("click",()=>{ showAllLabels=!showAllLabels; $("#rvShowAll").classList.toggle("active",showAllLabels); if(showAllLabels) paintReviewAllLabels(); else clearReviewAllLabels(); });
+  // repaint persistent labels on scroll (positions are absolute within preview)
+  prev.addEventListener("scroll",()=>{ if(showAllLabels) paintReviewAllLabels(); });
   // filter chips
   $$("#rvFilter .rv-chip").forEach(c=>c.addEventListener("click",()=>{ reviewFilter=c.getAttribute("data-f"); $$("#rvFilter .rv-chip").forEach(x=>x.classList.toggle("active",x===c)); renderReviewFields(); }));
   // DESIGN -> FIELD hover: outline hovered element + light up its field, with a label box
@@ -2428,7 +2457,7 @@ function unlinkRoleInReview(key){
   if(key in state.profile) state.profile[key]="";
   const cf=(state.customFields||[]).find(f=>f.key===key); if(cf) cf.value="";
   harvestProfileFromDom(); renderAll(); persist();
-  openReviewModal();
+  refreshReview();
   const def=ROLE_BY_KEY[key]||(state.customFields||[]).find(f=>f.key===key);
   toast("Disconnected "+(def?def.label:key));
 }
@@ -2441,9 +2470,24 @@ function assignRoleInPreview(key, elTight){
   state.html=previewCleanHtml(prev);
   harvestProfileFromDom(); renderAll(); persist();
   reviewConnectKey=null;
-  openReviewModal();
+  refreshReview();
   const def=ROLE_BY_KEY[key]||(state.customFields||[]).find(f=>f.key===key);
   toast("Connected "+(def?def.label:key));
+}
+
+/* refresh the review in place WITHOUT losing scroll position (no modal rebuild) */
+function refreshReview(){
+  const fieldsWrap=$("#rvFields"); const prev=$("#rvPreview");
+  if(!fieldsWrap || !prev){ openReviewModal(); return; }
+  const fScroll = fieldsWrap.scrollTop, pScroll = prev.scrollTop;
+  // rebuild the design preview (adopts latest roles) and re-add the floating label
+  prev.innerHTML=cleanExportButKeepRoles();
+  prev.appendChild(el("div",{class:"rv-boxlabel",id:"rvBoxLabel"}));
+  if(showAllLabels) paintReviewAllLabels();
+  renderReviewFields();
+  renderReviewSocials();
+  // restore scroll positions
+  fieldsWrap.scrollTop=fScroll; prev.scrollTop=pScroll;
 }
 
 /* in-canvas connect mode (from banner / field link button) */
