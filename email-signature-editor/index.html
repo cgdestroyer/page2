@@ -217,9 +217,10 @@
     background: #ffffff; color: #111; border-radius: 6px; padding: 28px; min-height: 260px;
     box-shadow: var(--shadow); transition: background .15s; position: relative;
   }
-  /* dark-bg preview: paint the paper AND neutralize white fills bleeding through */
-  .paper.darkbg { background: #14141c; color: #e8e8ef; }
-  .paper.darkbg [data-sig-block] { background-color: transparent !important; }
+  /* dark-bg preview: paint the paper AND neutralize ANY white fills (tables, tds,
+     wrappers) that the imported design carries, so nothing stays white */
+  .paper.darkbg { background: #14141c !important; color: #e8e8ef; }
+  .paper.darkbg table, .paper.darkbg td, .paper.darkbg tr, .paper.darkbg div, .paper.darkbg p, .paper.darkbg span, .paper.darkbg [data-sig-block] { background-color: transparent !important; }
 
   /* fit/pan helpers */
   .pan-hint { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); font-size: 10.5px; color: var(--faint); background: rgba(10,13,26,.7); border: 1px solid var(--border); padding: 3px 10px; border-radius: 999px; pointer-events: none; opacity: 0; transition: opacity .2s; }
@@ -228,7 +229,8 @@
   /* ---------- Editor block chrome (only in edit mode) — lighter & non-overlapping ---------- */
   .editing [data-sig-block] { position: relative; outline: 1px dashed transparent; transition: outline-color .1s; }
   .editing:not(.boxes-all) [data-sig-block]:hover { outline-color: rgba(108,140,255,.45); }
-  .editing.boxes-all [data-sig-block] { outline-color: rgba(108,140,255,.28); }
+  /* show-all boxes (works even if edit chrome is off) */
+  .boxes-all [data-sig-block] { outline: 1px solid rgba(108,140,255,.55) !important; }
   .editing [data-sig-block].selected { outline: 2px solid var(--accent); outline-offset: 2px; }
   .editing [data-sig-block].connecting { outline: 2px dashed var(--good) !important; }
   .blocktag {
@@ -237,7 +239,8 @@
     text-transform: uppercase; pointer-events: none; white-space: nowrap;
   }
   .editing [data-sig-block].selected > .blocktag { display: block; }
-  .editing.labels-all [data-sig-block] > .blocktag { display: block; opacity: .55; }
+  /* show-all labels (works even if edit chrome is off) */
+  .labels-all [data-sig-block] > .blocktag { display: block !important; opacity: .9; }
   /* toolbar floats ABOVE the block, right-aligned, only on selection; compact */
   .block-toolbar {
     position: absolute; top: -13px; right: 0; display: none; gap: 1px; z-index: 9;
@@ -292,6 +295,12 @@
   .canvas-box.label-below .cb-label { top: 2px; border-radius: 0 0 4px 4px; }
   .canvas-box.ok .cb-label { background: var(--good); color: #042a1c; }
   .canvas-box.warn .cb-label { background: var(--warn); color: #3a2a04; }
+
+  /* grouped field (text box + paired icon box, closely related) */
+  .cgroup { margin-bottom: 11px; border-left: 2px solid var(--border); padding-left: 6px; }
+  .cgroup .cfield { margin-bottom: 5px; }
+  .cfield.iconsub { background: var(--panel); border-style: dashed; }
+  .cfield.iconsub .clabel { color: var(--muted); font-weight: 500; }
 
   /* compact field rows */
   .mini-btn { background: var(--panel-3); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; font-size: 10px; padding: 3px 7px; cursor: pointer; flex: 0 0 auto; }
@@ -844,6 +853,7 @@ function renderCanvas(){
   updateHealth();
   updateConnCount();
   setupMobileScreen();
+  hideCanvasBox();   // never leave a stale hover box after a re-render
 }
 
 /* refresh the live HTML string from current paper DOM (view->model) */
@@ -1090,6 +1100,7 @@ function applyView(){
   const vp=$("#canvasViewport"); if(!vp) return;
   vp.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.zoom})`;
   const zv=$("#zoomVal"); if(zv) zv.textContent=Math.round(view.zoom*100)+"%";
+  hideCanvasBox();  // overlay coords are stale after pan/zoom
 }
 function setZoom(z){ view.zoom=Math.max(0.25,Math.min(3,z)); applyView(); }
 function fitToView(){
@@ -1124,75 +1135,93 @@ function allFieldDefs(){
 function roleBoundBlock(key){ return $(`#paper [data-sig-role="${key}"]`); }
 
 let fieldFilter="all";
+/* which roles can have an optional paired icon */
+function roleCanHaveIcon(key, custom){ return ["phone","email","website","address","name","title","company"].includes(key) || custom; }
+
 function renderFields(){
   const host=$("#fieldsHost"); if(!host) return; host.innerHTML="";
   allFieldDefs().forEach(def=>{
     const bound = !!roleBoundBlock(def.key);
     if(fieldFilter==="connected" && !bound) return;
     if(fieldFilter==="unlinked" && bound) return;
-    const val = def.custom ? (state.customFields.find(f=>f.key===def.key)||{}).value : state.profile[def.key];
-    const wrap=el("div",{ class:"cfield compact"+(bound?" connected":""), "data-role":def.key });
-
-    // compact head: [dot] label ............ [input toggle] [Connect/Disconnect]
-    const head=el("div",{class:"chead"});
-    head.appendChild(el("span",{class:"status"}));
-    head.appendChild(el("span",{class:"clabel"}, esc(def.label)));
-    head.appendChild(el("span",{class:"cbind"+(bound?"":" unbound")}, bound?"linked":"—"));
-    // edit toggle (show/hide value input)
-    const editBtn=el("button",{class:"mini-btn",title:"Edit value"},"✎");
-    head.appendChild(editBtn);
-    // connect / disconnect inline
-    if(bound){
-      const un=el("button",{class:"mini-btn",title:"Disconnect"},"⦸");
-      un.addEventListener("click",()=>unlinkRole(def.key));
-      head.appendChild(un);
-    } else {
-      const cbtn=el("button",{class:"mini-btn connect",title:"Click then click an element in the design"},"link");
-      cbtn.addEventListener("click",()=>startCanvasConnect(def.key));
-      head.appendChild(cbtn);
+    // a "group" container holds the TEXT sub-box and (optionally) the ICON sub-box
+    const group=el("div",{class:"cgroup"});
+    group.appendChild(buildFieldBox(def, false));   // text sub-box
+    if(def.type!=="image" && roleCanHaveIcon(def.key, def.custom)){
+      group.appendChild(buildFieldBox(def, true));   // paired icon sub-box
     }
-    if(def.custom){ const del=el("button",{class:"mini-btn",title:"Remove field"},"×"); del.addEventListener("click",()=>{ state.customFields=state.customFields.filter(f=>f.key!==def.key); renderFields(); }); head.appendChild(del); }
-    wrap.appendChild(head);
-
-    // value input (hidden by default to keep compact; shown on toggle or when it has focus)
-    let input;
-    if(def.type==="image"){ input=el("input",{type:"url",placeholder:"Image URL", value:esc(val||"")}); }
-    else if(def.type==="email"){ input=el("input",{type:"email", value:esc(val||"")}); }
-    else if(def.type==="url"){ input=el("input",{type:"url", value:esc(val||"")}); }
-    else { input=el("input",{type:"text", value:esc(val||"")}); }
-    input.className="cfield-input";
-    input.style.display = (val||def.type==="image") ? "block" : "none";
-    input.addEventListener("input",()=>{
-      if(def.custom){ const f=state.customFields.find(x=>x.key===def.key); if(f) f.value=input.value; }
-      else state.profile[def.key]=input.value;
-      snapshot(); renderCanvas(); persist();
-    });
-    editBtn.addEventListener("click",()=>{ input.style.display = input.style.display==="none"?"block":"none"; if(input.style.display==="block") input.focus(); });
-    wrap.appendChild(input);
-
-    // per-line leading icon box for text roles (phone/email/website/address/custom text)
-    if(def.type!=="image" && (["phone","email","website","address"].includes(def.key) || def.custom)){
-      const iconBtn=el("button",{class:"mini-btn",title:"Leading icon"}, state.lineIcons[def.key] ? "◉ icon" : "○ icon");
-      iconBtn.style.marginLeft="4px";
-      head.insertBefore(iconBtn, editBtn);
-      const iconHost=el("div"); iconHost.style.display="none";
-      lineIconControl(iconHost, def.key);
-      iconBtn.addEventListener("click",()=>{ iconHost.style.display = iconHost.style.display==="none"?"block":"none"; });
-      wrap.appendChild(iconHost);
-    }
-
-    // hover highlight both ways (field -> design bounding box)
-    wrap.addEventListener("mouseenter",()=>highlightRole(def.key,true));
-    wrap.addEventListener("mouseleave",()=>highlightRole(def.key,false));
-
-    // drag-to-connect: field is a drop target for canvas blocks
-    wrap.addEventListener("dragover",ev=>{ if(dragKind==="block"){ ev.preventDefault(); wrap.classList.add("droptarget"); } });
-    wrap.addEventListener("dragleave",()=>wrap.classList.remove("droptarget"));
-    wrap.addEventListener("drop",ev=>{ ev.preventDefault(); wrap.classList.remove("droptarget"); if(draggedBlock){ connectRoleToBlock(def.key, draggedBlock); } });
-
-    host.appendChild(wrap);
+    host.appendChild(group);
   });
   updateConnCount();
+}
+
+/* build one connectable box. isIcon=false => text/value box; isIcon=true => icon box
+   The icon box binds a separate role "<key>__icon" to an <img> in the design. */
+function buildFieldBox(def, isIcon){
+  const roleKey = isIcon ? def.key+"__icon" : def.key;
+  const label = isIcon ? (def.label+" icon") : def.label;
+  const bound = !!roleBoundBlock(roleKey);
+  const wrap=el("div",{ class:"cfield compact"+(bound?" connected":"")+(isIcon?" iconsub":""), "data-role":roleKey });
+
+  const head=el("div",{class:"chead"});
+  head.appendChild(el("span",{class:"status"}));
+  head.appendChild(el("span",{class:"clabel"}, (isIcon?"⬙ ":"")+esc(label)));
+  head.appendChild(el("span",{class:"cbind"+(bound?"":" unbound")}, bound?"linked":"—"));
+  const editBtn=el("button",{class:"mini-btn",title:isIcon?"Edit icon URL":"Edit value"},"✎");
+  head.appendChild(editBtn);
+  if(bound){
+    const un=el("button",{class:"mini-btn",title:"Disconnect"},"⦸");
+    un.addEventListener("click",()=>unlinkRole(roleKey));
+    head.appendChild(un);
+  } else {
+    const cbtn=el("button",{class:"mini-btn connect",title:"Click, then click the "+(isIcon?"icon image":"element")+" in the design"},"link");
+    cbtn.addEventListener("click",()=>startCanvasConnect(roleKey));
+    head.appendChild(cbtn);
+  }
+  if(def.custom && !isIcon){ const del=el("button",{class:"mini-btn",title:"Remove field"},"×"); del.addEventListener("click",()=>{ state.customFields=state.customFields.filter(f=>f.key!==def.key); renderFields(); }); head.appendChild(del); }
+  wrap.appendChild(head);
+
+  // value / icon-url input
+  let input;
+  const curVal = isIcon ? (state.lineIcons[def.key]||iconSrcFromDom(roleKey)||"")
+                        : (def.custom ? (state.customFields.find(f=>f.key===def.key)||{}).value : state.profile[def.key]);
+  input=el("input",{type:isIcon?"url":(def.type==="email"?"email":def.type==="url"?"url":"text"), placeholder:isIcon?"icon image URL":"value", value:esc(curVal||"")});
+  input.className="cfield-input";
+  input.style.display = (curVal) ? "block" : "none";
+  input.addEventListener("input",()=>{
+    if(isIcon){ setIconForRole(def.key, input.value); }
+    else if(def.custom){ const f=state.customFields.find(x=>x.key===def.key); if(f) f.value=input.value; snapshot(); renderCanvas(); persist(); }
+    else { state.profile[def.key]=input.value; snapshot(); renderCanvas(); persist(); }
+  });
+  editBtn.addEventListener("click",()=>{ input.style.display = input.style.display==="none"?"block":"none"; if(input.style.display==="block") input.focus(); });
+  wrap.appendChild(input);
+
+  // hover highlight both ways
+  wrap.addEventListener("mouseenter",()=>highlightRole(roleKey,true));
+  wrap.addEventListener("mouseleave",()=>highlightRole(roleKey,false));
+  // drag a design element/icon onto this box to connect
+  wrap.addEventListener("dragover",ev=>{ if(dragKind==="block"){ ev.preventDefault(); wrap.classList.add("droptarget"); } });
+  wrap.addEventListener("dragleave",()=>wrap.classList.remove("droptarget"));
+  wrap.addEventListener("drop",ev=>{ ev.preventDefault(); wrap.classList.remove("droptarget"); if(draggedBlock){ connectRoleToBlock(roleKey, draggedBlock); } });
+  return wrap;
+}
+
+/* read the src of an icon-role's bound img in the design */
+function iconSrcFromDom(roleKey){ const n=$(`#paper [data-sig-role="${roleKey}"]`); if(!n) return ""; const img=n.tagName==="IMG"?n:n.querySelector("img"); return img?(img.getAttribute("src")||""):""; }
+
+/* set/clear the icon image for a role. If an icon element is already connected
+   in the design, update its src; otherwise store as a leading icon (lineIcons). */
+function setIconForRole(key, url){
+  const roleKey=key+"__icon";
+  const bound=$(`#paper [data-sig-role="${roleKey}"]`);
+  if(bound){
+    const img=bound.tagName==="IMG"?bound:bound.querySelector("img");
+    if(url){ if(img) img.setAttribute("src",url); } else { delete state.lineIcons[key]; }
+    afterStructureChange();
+  } else {
+    if(url) state.lineIcons[key]=url; else delete state.lineIcons[key];
+    snapshot(); renderCanvas(); persist();
+  }
 }
 
 function highlightRole(key, on){
@@ -1693,18 +1722,28 @@ function showDropLineAt(target, after){
   if(after) target.after(dropLine); else target.before(dropLine);
 }
 
+/* find the block nearest to the cursor (any nesting level), and whether to
+   drop before or after it — enables reordering inside table columns too */
+function nearestDropTarget(paper, x, y){
+  const blocks=$$("[data-sig-block]",paper).filter(b=>b!==draggedBlock && !(draggedBlock&&draggedBlock.contains(b)));
+  let best=null, bestDist=Infinity, after=false;
+  for(const b of blocks){
+    const r=b.getBoundingClientRect();
+    if(r.width===0&&r.height===0) continue;
+    const cx=r.left+r.width/2, cy=r.top+r.height/2;
+    const d=Math.hypot(x-cx, y-cy);
+    if(d<bestDist){ bestDist=d; best=b; after=(y>cy); }
+  }
+  return best?{block:best, after}:null;
+}
 function setupCanvasDrop(){
   const paper=$("#paper");
   paper.addEventListener("dragover",ev=>{
     if(dragKind!=="palette" && dragKind!=="block") return;
     ev.preventDefault(); ev.dataTransfer.dropEffect = dragKind==="palette"?"copy":"move";
-    const blocks=$$("[data-sig-block]",paper).filter(b=>b!==draggedBlock);
-    let placed=false;
-    for(const b of blocks){
-      const r=b.getBoundingClientRect();
-      if(ev.clientY < r.top + r.height/2){ showDropLineAt(b,false); placed=true; break; }
-    }
-    if(!placed){ const last=blocks[blocks.length-1]; if(last) showDropLineAt(last,true); else { removeDropLine(); dropLine=el("div",{class:"drop-line","data-chrome":"1"}); paper.appendChild(dropLine); } }
+    const t=nearestDropTarget(paper, ev.clientX, ev.clientY);
+    if(t){ showDropLineAt(t.block, t.after); }
+    else { removeDropLine(); dropLine=el("div",{class:"drop-line","data-chrome":"1"}); paper.appendChild(dropLine); }
   });
   paper.addEventListener("dragleave",ev=>{ if(ev.target===paper) removeDropLine(); });
   paper.addEventListener("drop",ev=>{
@@ -2019,7 +2058,12 @@ function directText(n){
   let s="";
   n.childNodes.forEach(c=>{
     if(c.nodeType===3) s+=c.textContent;
-    else if(c.nodeType===1 && ["b","strong","em","span","a","font","i","u","br"].includes(c.tagName.toLowerCase())) s+=c.textContent;
+    else if(c.nodeType===1){
+      if(c.hasAttribute && c.hasAttribute("data-chrome")) return;      // skip editor chrome
+      const cl=typeof c.className==="string"?c.className:"";
+      if(/\b(blocktag|block-toolbar|rz-handle|sig-line-icon)\b/.test(cl)) return;
+      if(["b","strong","em","span","a","font","i","u"].includes(c.tagName.toLowerCase())) s+=directText(c); // recurse to skip nested chrome
+    }
   });
   return s.replace(/\s+/g," ").trim();
 }
@@ -2216,18 +2260,20 @@ function openReviewModal(){
     </div>
     <div class="review-grid" style="margin-top:10px;">
       <div class="review-col"><h4>Fields</h4><div class="review-fields" id="rvFields"></div></div>
-      <div class="review-col"><h4>Design</h4><div class="review-preview" id="rvPreview"><div class="rv-boxlabel" id="rvBoxLabel"></div></div></div>
+      <div class="review-col"><h4>Design</h4><div class="review-preview" id="rvPreview"></div></div>
     </div>
   `, [ {label:"Normalize now", cls:"ghost", act:()=>{ normalizeInPlace(); closeModal(); }}, {label:"Done", cls:"", act:closeModal} ]);
   const prev=$("#rvPreview"); prev.innerHTML=cleanExportButKeepRoles();
-  // (re)create the floating label inside the (positioned) preview
-  const lbl=el("div",{class:"rv-boxlabel",id:"rvBoxLabel"}); prev.appendChild(lbl);
+  // exactly ONE floating label inside the (positioned) preview
+  prev.appendChild(el("div",{class:"rv-boxlabel",id:"rvBoxLabel"}));
   renderReviewFields();
   // filter chips
   $$("#rvFilter .rv-chip").forEach(c=>c.addEventListener("click",()=>{ reviewFilter=c.getAttribute("data-f"); $$("#rvFilter .rv-chip").forEach(x=>x.classList.toggle("active",x===c)); renderReviewFields(); }));
   // DESIGN -> FIELD hover: outline hovered element + light up its field, with a label box
   prev.addEventListener("mousemove", onReviewPreviewHover);
   prev.addEventListener("mouseleave", clearReviewHover);
+  // never follow links in the review preview
+  prev.addEventListener("click", e=>{ const a=e.target.closest && e.target.closest("a"); if(a) e.preventDefault(); }, true);
 }
 function renderReviewFields(){
   const prev=$("#rvPreview"); const fields=$("#rvFields"); if(!fields) return;
@@ -2275,20 +2321,19 @@ function enableReviewDragSources(){
 }
 
 function onReviewPreviewHover(ev){
-  const prev=$("#rvPreview");
+  const prev=$("#rvPreview"); if(!prev) return;
   const el2=tightestBlock(ev.target);
-  if(!el2 || el2===prev){ clearReviewHover(); return; }
-  $$(".rv-hover",prev).forEach(n=>n.classList.remove("rv-hover"));
+  // always clear previous marks first so nothing sticks
+  $$(".rv-hover,.rv-mark",prev).forEach(n=>n.classList.remove("rv-hover","rv-mark"));
+  if(!el2 || el2===prev || el2.id==="rvBoxLabel"){ hideReviewBox(); $$("#rvFields .cfield").forEach(f=>f.classList.remove("highlight")); return; }
   el2.classList.add("rv-hover");
   const role=el2.getAttribute && el2.getAttribute("data-sig-role");
   const def=role && (ROLE_BY_KEY[role] || (state.customFields||[]).find(f=>f.key===role));
-  const label = def ? ("● "+def.label) : "○ not connected";
-  showReviewBox(el2, label, !!def);
-  // light up the matching left field
+  showReviewBox(el2, def ? ("● "+def.label) : "○ not connected", !!def);
   $$("#rvFields .cfield").forEach(f=>f.classList.toggle("highlight", role && f.getAttribute("data-role")===role));
 }
 function clearReviewHover(){
-  const prev=$("#rvPreview"); if(prev) $$(".rv-hover",prev).forEach(n=>n.classList.remove("rv-hover"));
+  const prev=$("#rvPreview"); if(prev) $$(".rv-hover,.rv-mark",prev).forEach(n=>n.classList.remove("rv-hover","rv-mark"));
   $$("#rvFields .cfield").forEach(f=>f.classList.remove("highlight"));
   hideReviewBox();
 }
@@ -2317,11 +2362,18 @@ function startReviewConnect(key, btn){
   };
   prev.addEventListener("click",handler,true);
 }
+/* capture the preview's signature HTML WITHOUT the editor-only label/marks */
+function previewCleanHtml(prev){
+  const c=prev.cloneNode(true);
+  c.querySelectorAll("#rvBoxLabel,.rv-boxlabel").forEach(n=>n.remove());
+  c.querySelectorAll(".rv-hover,.rv-mark").forEach(n=>n.classList.remove("rv-hover","rv-mark"));
+  return c.innerHTML;
+}
 /* remove a role binding from inside the review preview */
 function unlinkRoleInReview(key){
   const prev=$("#rvPreview");
   prev.querySelectorAll(`[data-sig-role="${key}"]`).forEach(n=>n.removeAttribute("data-sig-role"));
-  state.html=prev.innerHTML;
+  state.html=previewCleanHtml(prev);
   // clear the now-unbound field value so it shows empty/not-linked
   if(key in state.profile) state.profile[key]="";
   const cf=(state.customFields||[]).find(f=>f.key===key); if(cf) cf.value="";
@@ -2336,7 +2388,7 @@ function assignRoleInPreview(key, elTight){
   const prev=$("#rvPreview");
   prev.querySelectorAll(`[data-sig-role="${key}"]`).forEach(n=>{ if(n!==elTight) n.removeAttribute("data-sig-role"); });
   elTight.setAttribute("data-sig-role",key);
-  state.html=prev.innerHTML;
+  state.html=previewCleanHtml(prev);
   harvestProfileFromDom(); renderAll(); persist();
   reviewConnectKey=null;
   openReviewModal();
@@ -2521,10 +2573,8 @@ function bindUI(){
   $("#connectCancel").addEventListener("click",()=>{ connectMode.active=false; $("#connectBanner").classList.remove("show"); });
   // click empty paper deselects
   $("#stage").addEventListener("click",e=>{ if(e.target.id==="stage"||e.target.id==="paper"){ selectBlock(null); openInspectorFor(null); } });
-  // suppress link navigation (mailto:/tel:/http) while in edit mode
-  $("#paper").addEventListener("click", e=>{
-    if(state.editMode){ const a=e.target.closest && e.target.closest("a"); if(a){ e.preventDefault(); } }
-  }, true);
+  // ALWAYS suppress link navigation (mailto:/tel:/http) inside the editor canvas
+  $("#paper").addEventListener("click", e=>{ const a=e.target.closest && e.target.closest("a"); if(a){ e.preventDefault(); } }, true);
   // canvas hover -> bounding box + field highlight
   $("#paper").addEventListener("mousemove", onCanvasHover);
   $("#paper").addEventListener("mouseleave", ()=>{ hideCanvasBox(); $$("#fieldsHost .cfield.highlight").forEach(f=>f.classList.remove("highlight")); });
