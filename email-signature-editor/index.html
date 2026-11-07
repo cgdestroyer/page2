@@ -784,14 +784,18 @@ function commitInlineEdit(b){
    ================================================================ */
 function applyProfileToDom(paper){
   const p = state.profile;
+  const hasSeparateCompany = !!paper.querySelector('[data-sig-role="company"]');
   ROLES.forEach(r=>{
     const val = p[r.key];
+    // Non-destructive: an empty profile value must NOT wipe imported content.
+    if(val==null || val==="") return;
     $$(`[data-sig-role="${r.key}"]`, paper).forEach(node=>{
       if(r.type==="image"){
         const img = node.tagName==="IMG" ? node : node.querySelector("img");
-        if(img && val!=null && val!=="") img.setAttribute("src", val);
-      } else if(r.key==="title"){
-        // composite title · company — rebuild if both are simple
+        if(img) img.setAttribute("src", val);
+      } else if(r.key==="title" && !hasSeparateCompany && p.company){
+        // our generated layouts render "title · company" in one node;
+        // only do that when there is NO separate company block to avoid clobbering imports
         setRoleText(node, [p.title,p.company].filter(Boolean).join(" · "), val);
       } else {
         setRoleText(node, val, val);
@@ -800,7 +804,8 @@ function applyProfileToDom(paper){
   });
   // custom fields
   (state.customFields||[]).forEach(f=>{
-    $$(`[data-sig-role="${f.key}"]`, paper).forEach(node=>{ if(f.type!=="image" && f.value!=null) setRoleText(node, f.value, f.value); });
+    if(f.type==="image" || f.value==null || f.value==="") return;
+    $$(`[data-sig-role="${f.key}"]`, paper).forEach(node=>{ setRoleText(node, f.value, f.value); });
   });
 }
 /* write text into a role block while preserving a single inner <a> if present
@@ -1434,7 +1439,7 @@ function openImportModal(){
     </div>
     <div class="file-drop" id="impDrop" style="margin-top:10px;">Drop a .html or .json file here</div>
     <div class="checkbox-group" style="margin-top:12px;">
-      <div class="checkrow"><input type="checkbox" id="impNormalize" checked><label for="impNormalize">Normalize to clean standard structure on import</label></div>
+      <div class="checkrow"><input type="checkbox" id="impNormalize"><label for="impNormalize">Also rewrite to clean standard structure <span style="color:var(--faint)">(changes the layout — leave off to keep the original design exactly)</span></label></div>
       <div class="checkrow"><input type="checkbox" id="impReview" checked><label for="impReview">Open connection review after import</label></div>
     </div>
     <div class="warnbox">Base64-embedded images are flagged — host images and use URLs for reliable delivery.</div>
@@ -1472,47 +1477,119 @@ function doImportHtml(html){
   const doNorm=$("#impNormalize") && $("#impNormalize").checked;
   const doReview=$("#impReview") && $("#impReview").checked;
   // recognize roles heuristically on a detached tree
-  const tmp=document.createElement("div"); tmp.innerHTML=html;
+  const tmp=document.createElement("div"); tmp.innerHTML=sanitizeImported(html);
   markBlocks(tmp);
   recognizeRoles(tmp);
-  state.html = doNorm ? normalizeStructure(tmp) : tmp.innerHTML.trim();
-  // pull recognized values into profile
+  // IMPORTANT: start from a BLANK profile so leftover defaults can't leak
+  // into the imported design. We only keep values we actually harvest.
+  blankProfile();
+  state.__importedSocials = state.__importedSocials || [];
+  if(doNorm){
+    // normalize rebuilds a clean layout from recognized roles only
+    state.html = normalizeStructure(tmp);
+  } else {
+    // preserve the pasted design verbatim (just tagged with roles)
+    state.html = tmp.innerHTML.trim();
+  }
   harvestProfileFromDom();
   snapshot(); renderAll(); persist(); closeModal();
-  toast("Imported"+(doNorm?" & normalized":""));
+  toast("Imported"+(doNorm?" & normalized":" (original layout kept)"));
   if(doReview) openReviewModal();
 }
 
-/* give every top-level-ish element a data-sig-block marker so it's editable */
-function markBlocks(root){
-  // mark direct children of root and common containers
-  const marks=root.children;
-  // also mark tables, imgs, anchors groups
-  $$("table,img,a,div,p,span",root).forEach(n=>{});
-  Array.from(root.querySelectorAll("img,table")).forEach(n=>{ if(!n.hasAttribute("data-sig-block")) n.setAttribute("data-sig-block",""); });
-  Array.from(root.children).forEach(n=>{ if(!n.hasAttribute("data-sig-block")) n.setAttribute("data-sig-block",""); });
+/* wipe profile text/image values so the imported design shows its OWN content,
+   not editor defaults. Socials are replaced by harvested ones. */
+function blankProfile(){
+  Object.keys(state.profile).forEach(k=>{ state.profile[k]=""; });
+  state.socials=[];
+  state.customFields=[];
 }
 
-/* heuristic recognizer */
+/* light sanitize: drop <script>/<style>/<head> wrappers and comments-only noise
+   that commonly ride along with pasted email HTML, without altering layout. */
+function sanitizeImported(html){
+  const d=document.createElement("div"); d.innerHTML=html;
+  d.querySelectorAll("script,style,meta,link,title,head").forEach(n=>n.remove());
+  // unwrap a single outer <html>/<body> if present
+  const body=d.querySelector("body"); if(body) return body.innerHTML.trim();
+  return d.innerHTML.trim();
+}
+
+/* Mark atomic, editable blocks WITHOUT creating giant catch-all blocks.
+   We mark images and anchors always, plus leaf-ish text containers (a node
+   that holds text but has no child element that itself holds much text). */
+function markBlocks(root){
+  // images and links are always atomic blocks
+  Array.from(root.querySelectorAll("img,a")).forEach(n=>{ if(!n.hasAttribute("data-sig-block")) n.setAttribute("data-sig-block",""); });
+  // text leaves: elements whose direct text content is non-trivial and which
+  // do NOT contain another block-level text element (avoids wrapping everything)
+  const textTags=["p","span","div","td","h1","h2","h3","h4","b","strong","em","font"];
+  Array.from(root.querySelectorAll(textTags.join(","))).forEach(n=>{
+    if(n.hasAttribute("data-sig-block")) return;
+    // skip if it contains block children that will themselves be text leaves
+    const hasBlockTextChild = Array.from(n.children).some(c=>{
+      const t=c.tagName.toLowerCase();
+      return ["p","div","td","h1","h2","h3","h4","table","tr"].includes(t) && (c.textContent||"").trim().length>0;
+    });
+    const ownText=directText(n);
+    if(!hasBlockTextChild && ownText.length>0){ n.setAttribute("data-sig-block",""); }
+  });
+}
+/* text that belongs directly to node (not deep descendants' block text) */
+function directText(n){
+  let s="";
+  n.childNodes.forEach(c=>{ if(c.nodeType===3) s+=c.textContent; else if(c.nodeType===1 && ["b","strong","em","span","a","font","i","u"].includes(c.tagName.toLowerCase())) s+=c.textContent; });
+  return s.trim();
+}
+
+/* heuristic recognizer — tags TIGHT elements, never a huge container */
 function recognizeRoles(root){
-  // images: first image = photo/logo; banner = widest/last wide image
-  const imgs=$$("img",root);
-  if(imgs.length){
-    imgs[0].setAttribute("data-sig-role","photo");
-    if(imgs.length>1) imgs[imgs.length-1].setAttribute("data-sig-role", (parseInt(imgs[imgs.length-1].getAttribute("width"))||0)>240?"banner":"logo");
-  }
-  // social: anchors whose href matches known networks → group into existing table/row or tag the anchor's row
-  const socialHosts={linkedin:/linkedin\.com/i,twitter:/(twitter|x)\.com/i,github:/github\.com/i,instagram:/instagram\.com/i,facebook:/facebook\.com/i,youtube:/(youtube|youtu\.be)/i};
+  const socialHosts={linkedin:/linkedin\.com/i,twitter:/(twitter\.com|\/\/x\.com|\bx\.com)/i,github:/github\.com/i,instagram:/instagram\.com/i,facebook:/facebook\.com/i,youtube:/(youtube\.com|youtu\.be)/i};
+
+  // ---- images: first = photo, large/last = logo or banner ----
+  const imgs=$$("img",root).filter(im=>{ const s=(im.getAttribute("src")||""); return s && !/linkedin|twitter|github|instagram|facebook|youtube|\.svg/i.test(s); });
+  if(imgs[0]) imgs[0].setAttribute("data-sig-role","photo");
+  if(imgs.length>1){ const last=imgs[imgs.length-1]; const w=parseInt(last.getAttribute("width"))||0; last.setAttribute("data-sig-role", w>240?"banner":"logo"); }
+
+  // ---- social links: collect, don't tag each line as a contact ----
   const found=[];
   $$("a",root).forEach(a=>{ const h=a.getAttribute("href")||""; for(const k in socialHosts){ if(socialHosts[k].test(h)){ found.push({type:k,url:h}); break; } } });
-  if(found.length){ state.__importedSocials=found; }
-  // email / phone / website via anchors
-  $$("a",root).forEach(a=>{ const h=a.getAttribute("href")||""; if(/^mailto:/i.test(h)) a.setAttribute("data-sig-role","email"); else if(/^tel:/i.test(h)) a.setAttribute("data-sig-role","phone"); });
-  // name: the largest-font text or first strong/b or h1-h3
-  const heading=root.querySelector("h1,h2,h3,b,strong");
-  if(heading){ const holder=heading.closest("[data-sig-block]")||heading; holder.setAttribute("data-sig-role","name"); }
-  // website: anchor with http but not social/mailto/tel
-  $$("a",root).forEach(a=>{ const h=a.getAttribute("href")||""; if(/^https?:/i.test(h) && !Object.values(socialHosts).some(rx=>rx.test(h)) && !a.getAttribute("data-sig-role")){ a.setAttribute("data-sig-role","website"); } });
+  state.__importedSocials = found;
+
+  // ---- email / phone / website: tag the tightest element around the anchor ----
+  $$("a",root).forEach(a=>{
+    const h=a.getAttribute("href")||"";
+    const holder = a.hasAttribute("data-sig-block") ? a : (a.closest("[data-sig-block]")||a);
+    if(/^mailto:/i.test(h)) holder.setAttribute("data-sig-role","email");
+    else if(/^tel:/i.test(h)) holder.setAttribute("data-sig-role","phone");
+    else if(/^https?:/i.test(h) && !Object.values(socialHosts).some(rx=>rx.test(h)) && !holder.getAttribute("data-sig-role")) holder.setAttribute("data-sig-role","website");
+  });
+
+  // ---- name: the FIRST heading/bold text leaf (tight), not its container ----
+  const nameEl = pickNameElement(root);
+  if(nameEl && !nameEl.getAttribute("data-sig-role")) nameEl.setAttribute("data-sig-role","name");
+
+  // ---- phone / email by text pattern when not in an anchor ----
+  const marked=$$("[data-sig-block]",root);
+  marked.forEach(n=>{
+    if(n.getAttribute("data-sig-role")) return;
+    const t=directText(n); if(!t) return;
+    if(n===nameEl) return;
+    if(/^[\s(+]*\d[\d\s()\-./]{6,}$/.test(t)) n.setAttribute("data-sig-role","phone");
+    else if(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(t) && t.length<60) n.setAttribute("data-sig-role","email");
+  });
+}
+
+/* choose a tight element that looks like the person's name:
+   prefer the first h1-h3/b/strong leaf; fall back to the first short text leaf */
+function pickNameElement(root){
+  const candidates = $$("h1,h2,h3,b,strong",root)
+    .map(e=> e.hasAttribute("data-sig-block") ? e : (e.closest("[data-sig-block]")||e))
+    .filter(e=>{ const t=directText(e); return t && t.length<=60 && !/@|https?:|\+?\d{6,}/.test(t); });
+  if(candidates[0]) return candidates[0];
+  // fallback: first marked text leaf
+  const leaves=$$("[data-sig-block]",root).filter(n=>n.tagName!=="IMG" && n.tagName!=="A" && directText(n));
+  return leaves[0]||null;
 }
 
 function harvestProfileFromDom(){
@@ -1520,32 +1597,37 @@ function harvestProfileFromDom(){
   ROLES.forEach(r=>{
     const n=paper.querySelector(`[data-sig-role="${r.key}"]`); if(!n) return;
     if(r.type==="image"){ const img=n.tagName==="IMG"?n:n.querySelector("img"); if(img){ const v=img.getAttribute("src"); if(v) state.profile[r.key]=v; } }
-    else { const v=(n.textContent||"").trim(); if(v) state.profile[r.key]=v; }
+    else { const v=directText(n)||((n.textContent||"").trim()); if(v) state.profile[r.key]=v; }
   });
   if(state.__importedSocials && state.__importedSocials.length){
     state.socials = state.__importedSocials.map(s=>({id:uid("s"),type:s.type,url:s.url}));
-    delete state.__importedSocials;
   }
+  state.__importedSocials = [];
 }
 
 /* ================================================================
    NORMALIZE — rewrite to canonical structure
    ================================================================ */
 function normalizeStructure(root){
-  // Build a fresh standard stacked layout from recognized roles, preserving values.
-  const get=(key,attr)=>{ const n=root.querySelector(`[data-sig-role="${key}"]`); if(!n) return ""; if(attr==="src"){ const img=n.tagName==="IMG"?n:n.querySelector("img"); return img?img.getAttribute("src"):""; } return (n.textContent||"").trim(); };
-  // temporarily stash into profile to reuse infoStack generator
-  const prev=deepClone(state.profile);
-  state.profile.photo=get("photo","src")||prev.photo;
-  state.profile.logo=get("logo","src")||prev.logo;
-  state.profile.name=get("name")||prev.name;
-  ["title","company","tagline","phone","mobile","email","website","address","disclaimer"].forEach(k=>{ const v=get(k); if(v) state.profile[k]=v; });
-  const html = STARTERS.classic();
+  // Rebuild a clean standard layout using ONLY recognized values (no defaults).
+  const get=(key,attr)=>{ const n=root.querySelector(`[data-sig-role="${key}"]`); if(!n) return ""; if(attr==="src"){ const img=n.tagName==="IMG"?n:n.querySelector("img"); return img?img.getAttribute("src"):""; } return directText(n)||((n.textContent||"").trim()); };
+  // harvest recognized values into a fresh profile (don't keep defaults)
+  blankProfile();
+  state.profile.photo=get("photo","src");
+  state.profile.logo=get("logo","src");
+  state.profile.banner=get("banner","src");
+  ["name","title","company","tagline","phone","mobile","email","website","address","disclaimer"].forEach(k=>{ state.profile[k]=get(k); });
+  // harvested socials (set earlier by recognizeRoles)
+  if(state.__importedSocials && state.__importedSocials.length){
+    state.socials = state.__importedSocials.map(s=>({id:uid("s"),type:s.type,url:s.url}));
+  }
+  // pick a sensible starter: photo present -> classic, else stacked
+  const html = state.profile.photo ? STARTERS.classic() : STARTERS.stacked();
   return html;
 }
 function normalizeInPlace(){
   const tmp=document.createElement("div"); tmp.innerHTML=state.html; markBlocks(tmp); recognizeRoles(tmp);
-  state.html=normalizeStructure(tmp); harvestProfileFromDom(); snapshot(); renderAll(); persist(); toast("Normalized to standard structure");
+  state.html=normalizeStructure(tmp); snapshot(); renderAll(); persist(); toast("Normalized to standard structure");
 }
 
 /* ================================================================
