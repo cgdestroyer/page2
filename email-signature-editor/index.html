@@ -224,11 +224,13 @@
   .drop-line { height: 3px; background: var(--accent); border-radius: 2px; margin: 2px 0; box-shadow: 0 0 8px var(--accent); }
 
   /* hover bounding box overlay on the canvas (shows role connection) */
-  .canvas-box { position: fixed; display: none; border: 2px solid var(--accent); border-radius: 4px; pointer-events: none; z-index: 40; box-shadow: 0 0 0 2px rgba(108,140,255,.2); }
+  .canvas-box { position: fixed; display: none; border: 2px solid var(--accent); border-radius: 4px; pointer-events: none; z-index: 60; box-shadow: 0 0 0 2px rgba(108,140,255,.2); }
   .canvas-box.show { display: block; }
   .canvas-box.ok { border-color: var(--good); box-shadow: 0 0 0 2px rgba(53,192,138,.2); }
   .canvas-box.warn { border-color: var(--warn); box-shadow: 0 0 0 2px rgba(230,179,77,.2); }
-  .canvas-box .cb-label { position: absolute; top: -19px; left: -2px; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 4px 4px 0 0; white-space: nowrap; color: #fff; background: var(--accent); }
+  .canvas-box .cb-label { position: absolute; top: -18px; left: -2px; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 4px 4px 0 0; white-space: nowrap; color: #fff; background: var(--accent); }
+  /* when the box is near the top of the viewport, show the label INSIDE-top instead of above */
+  .canvas-box.label-below .cb-label { top: 2px; border-radius: 0 0 4px 4px; }
   .canvas-box.ok .cb-label { background: var(--good); color: #042a1c; }
   .canvas-box.warn .cb-label { background: var(--warn); color: #3a2a04; }
 
@@ -802,7 +804,8 @@ function decorateBlocks(paper){
 
 function isTextBlock(b){
   const r=b.getAttribute("data-sig-role");
-  return b.tagName==="DIV" && !b.hasAttribute("data-sig-button") && !["divider","spacer","social"].includes(r);
+  const textTags=["DIV","P","SPAN","TD","H1","H2","H3","H4","H5","B","STRONG","EM","FONT","LI","A"];
+  return textTags.includes(b.tagName) && !b.hasAttribute("data-sig-button") && b.tagName!=="IMG" && !["divider","spacer","social"].includes(r);
 }
 
 function selectBlock(b){
@@ -1040,7 +1043,8 @@ function showCanvasBox(target, label, ok){
   const box=$("#canvasBox"); if(!box||!target||!target.getBoundingClientRect) return;
   const r=target.getBoundingClientRect();
   if(r.width===0 && r.height===0){ hideCanvasBox(); return; }
-  box.className="canvas-box show "+(ok?"ok":"warn");
+  const nearTop = r.top < 24; // label would be clipped above -> draw it inside-top
+  box.className="canvas-box show "+(ok?"ok":"warn")+(nearTop?" label-below":"");
   box.style.left=(r.left-2)+"px"; box.style.top=(r.top-2)+"px";
   box.style.width=(r.width+4)+"px"; box.style.height=(r.height+4)+"px";
   $("#canvasBoxLabel").textContent=label;
@@ -1534,7 +1538,7 @@ function openImportModal(){
     <div class="file-drop" id="impDrop" style="margin-top:10px;">Drop a .html or .json file here</div>
     <div class="checkbox-group" style="margin-top:12px;">
       <div class="checkrow"><input type="checkbox" id="impStyle" checked><label for="impStyle">Grab brand colors &amp; fonts into the Style menu</label></div>
-      <div class="checkrow"><input type="checkbox" id="impNormalize"><label for="impNormalize">Also rewrite to clean standard structure <span style="color:var(--faint)">(changes the layout — leave off to keep the original design exactly)</span></label></div>
+      <div class="checkrow"><input type="checkbox" id="impNormalize" checked><label for="impNormalize">Normalize tags (keep the design) <span style="color:var(--faint)">— makes role tags consistent so sections are recognized; layout is preserved</span></label></div>
       <div class="checkrow"><input type="checkbox" id="impReview" checked><label for="impReview">Open connection review after import</label></div>
     </div>
     <div class="warnbox">Base64-embedded images are flagged — host images and use URLs for reliable delivery.</div>
@@ -1583,15 +1587,14 @@ function doImportHtml(html){
   // extract brand colors + fonts into the Style menu (before we rebuild)
   if(doStyle){ extractStyleFromDom(tmp); }
   if(doNorm){
-    // normalize rebuilds a clean layout from recognized roles only
-    state.html = normalizeStructure(tmp);
-  } else {
-    // preserve the pasted design verbatim (just tagged with roles)
-    state.html = tmp.innerHTML.trim();
+    // TAG-ONLY normalize: keep the exact design, just complete the role tags
+    $$("[data-sig-block]",tmp).forEach(n=>{ if(!n.getAttribute("data-sig-role")) n.setAttribute("data-sig-role","block"); });
   }
+  // always preserve the pasted design verbatim (tagged with roles)
+  state.html = tmp.innerHTML.trim();
   harvestProfileFromDom();
   snapshot(); renderAll(); persist(); closeModal();
-  toast("Imported"+(doNorm?" & normalized":" (original layout kept)")+(doStyle?" · brand style grabbed":""));
+  toast("Imported"+(doStyle?" · brand style grabbed":""));
   if(doReview) openReviewModal();
 }
 
@@ -1658,17 +1661,32 @@ function isSocialHref(h){ return Object.values(SOCIAL_HOSTS).some(rx=>rx.test(h|
 function markBlocks(root){
   // images and links are always atomic blocks
   Array.from(root.querySelectorAll("img,a")).forEach(n=>{ if(!n.hasAttribute("data-sig-block")) n.setAttribute("data-sig-block",""); });
-  const textTags=["p","span","div","td","h1","h2","h3","h4","h5","b","strong","em","font","li"];
+  const blockTags=["p","div","td","h1","h2","h3","h4","h5","li"];
+  const inlineTags=["span","b","strong","em","font","i","u"];
+  const textTags=blockTags.concat(inlineTags);
   Array.from(root.querySelectorAll(textTags.join(","))).forEach(n=>{
     if(n.hasAttribute("data-sig-block")) return;
     if(n.closest("a")) return; // text inside a link belongs to the link
     // does any descendant ELEMENT carry its own visible text? then n is a container
     const hasTextyChild = Array.from(n.children).some(c=>{
       if(c.tagName==="IMG") return false;
-      if(["b","strong","em","i","u","span","font","a","br"].includes(c.tagName.toLowerCase())) return false; // inline formatting = still a leaf
+      if(inlineTags.concat(["a","br"]).includes(c.tagName.toLowerCase())) return false; // inline formatting = still a leaf
       return (c.textContent||"").trim().length>0;
     });
-    if(!hasTextyChild && directText(n).length>0){ n.setAttribute("data-sig-block",""); }
+    if(hasTextyChild || directText(n).length===0) return;
+    // An INLINE element should NOT be its own leaf if it sits inside a block-level
+    // text leaf (e.g. <div><span>Dariusz</span> <span>Łacheta</span></div> -> mark
+    // the DIV, not the spans). Only mark the outermost block-level text leaf.
+    if(inlineTags.includes(n.tagName.toLowerCase())){
+      let p=n.parentElement;
+      while(p && p!==root){
+        if(blockTags.includes(p.tagName.toLowerCase()) && directText(p).length>0 && !Array.from(p.children).some(c=>blockTags.includes(c.tagName.toLowerCase()) && (c.textContent||"").trim())){
+          return; // a block-level ancestor will be the leaf; skip this inline
+        }
+        p=p.parentElement;
+      }
+    }
+    n.setAttribute("data-sig-block","");
   });
 }
 /* visible text that belongs directly to node (inline children included) */
@@ -1727,24 +1745,39 @@ function recognizeRoles(root){
   const nameEl=pickNameElement(root, leaves);
   if(nameEl && !nameEl.getAttribute("data-sig-role")) nameEl.setAttribute("data-sig-role","name");
 
-  const nameIdx = leaves.indexOf(nameEl);
-  leaves.forEach((n,i)=>{
+  const isContact = (t)=> /@/.test(t) || /https?:|www\./i.test(t) || /^[\s(+]*\d[\d\s()\-./]{5,}\d\s*$/.test(t);
+  const looksLikeNameWord = (t)=> /^[\p{Lu}][\p{L}'’.-]*$/u.test(t.trim()); // single capitalized word (Łacheta)
+
+  leaves.forEach((n)=>{
     if(n.getAttribute("data-sig-role")) return;
     const t=directText(n); if(!t) return;
     if(/^[\s(+]*\d[\d\s()\-./]{6,}\d$/.test(t)){ n.setAttribute("data-sig-role","phone"); return; }
     if(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(t) && t.length<80){ n.setAttribute("data-sig-role","email"); return; }
     if(/\b(www\.|https?:\/\/)\S+/i.test(t) && t.length<80){ n.setAttribute("data-sig-role","website"); return; }
-    // address heuristics: contains comma + (country/city words) or street tokens
-    if(/\b(st|street|ave|avenue|road|rd|suite|ste|floor|poland|usa|uk|city|,)\b/i.test(t) && t.length<80 && /[,\d]/.test(t)){ /* candidate — set later if unclaimed */ }
   });
 
-  // title/company: the 1–2 leaves immediately AFTER the name that are plain text
+  // title/company: look at the leaves AFTER the name — but first, if the name
+  // is a single word and the next leaf is also a single capitalized word (the
+  // surname split across elements), DON'T treat the surname as title/company.
+  const nameIdx = leaves.indexOf(nameEl);
   if(nameIdx>=0){
+    let cursor=nameIdx+1;
+    // skip a surname-continuation leaf (single capitalized word right after a 1-word name)
+    const nameText=directText(nameEl);
+    if(nameText && nameText.split(/\s+/).length===1){
+      const nxt=leaves[cursor];
+      if(nxt && !nxt.getAttribute("data-sig-role")){
+        const nt=directText(nxt);
+        if(nt && looksLikeNameWord(nt) && !isContact(nt)){ /* leave it unroled; it's part of the name visually */ cursor++; }
+      }
+    }
+    // now assign up to 2 descriptive lines as title then company
     let assigned=0;
-    for(let i=nameIdx+1;i<leaves.length && assigned<2;i++){
+    for(let i=cursor; i<leaves.length && assigned<2; i++){
       const n=leaves[i]; if(n.getAttribute("data-sig-role")) continue;
-      const t=directText(n);
-      if(!t || /@|https?:|www\.|^\+?[\d\s()\-./]{6,}$/i.test(t)) break; // stop at contact info
+      const t=directText(n); if(!t) break;
+      if(isContact(t)) break;                         // stop at contact info
+      if(looksLikeNameWord(t) && t.length<24 && assigned===0){ /* still ambiguous single word — could be a 1-word title like a role; allow */ }
       n.setAttribute("data-sig-role", assigned===0?"title":"company");
       assigned++;
     }
@@ -1755,13 +1788,31 @@ function recognizeRoles(root){
   if(addrCand) addrCand.setAttribute("data-sig-role","address");
 }
 
-/* choose a tight element that looks like the person's name */
+/* choose a tight element that looks like the person's name.
+   Prefer a bold/heading leaf whose text is a full name (2+ words). If the only
+   bold leaf is a single word (name split across elements), prefer the nearest
+   ancestor leaf that holds the FULL name text. */
 function pickNameElement(root, leaves){
+  leaves=leaves||$$("[data-sig-block]",root).filter(n=>n.tagName!=="IMG" && n.tagName!=="A" && directText(n));
   const bold=$$("h1,h2,h3,b,strong",root)
     .map(e=> e.hasAttribute("data-sig-block") ? e : (tightestBlock(e)||e))
     .filter(e=>{ const t=directText(e); return t && t.length<=60 && !/@|https?:|\+?\d{6,}/.test(t); });
-  if(bold[0]) return bold[0];
-  leaves=leaves||$$("[data-sig-block]",root).filter(n=>n.tagName!=="IMG" && n.tagName!=="A" && directText(n));
+  // 1) a bold leaf that already contains a full multi-word name
+  const full=bold.find(e=>{ const t=directText(e); return t.trim().split(/\s+/).length>=2; });
+  if(full) return full;
+  // 2) a bold single word -> try to climb to a leaf that holds the whole name line
+  if(bold[0]){
+    const b=bold[0];
+    // climb to the nearest block whose directText has 2+ words and isn't contact info
+    let anc=b;
+    while(anc && anc!==root){
+      const t=directText(anc);
+      if(t && t.trim().split(/\s+/).length>=2 && !/@|https?:|\+?\d{6,}/.test(t)){ return anc.hasAttribute&&anc.hasAttribute("data-sig-block")?anc:(tightestBlock(anc)||b); }
+      anc=anc.parentElement;
+    }
+    return b;
+  }
+  // 3) fallback: first text leaf
   return leaves[0]||null;
 }
 
@@ -1809,6 +1860,23 @@ function normalizeInPlace(){
   state.html=normalizeStructure(tmp); snapshot(); renderAll(); persist(); toast("Normalized to standard structure");
 }
 
+/* TAG-ONLY normalize: keep the EXACT design, only make the role tags /
+   data-sig-block markers consistent and complete in place. This is what the
+   user wants — "normalize tags & internal names, but the design stays". */
+function normalizeTagsInPlace(){
+  const tmp=document.createElement("div"); tmp.innerHTML=state.html;
+  // clear any stale markers/roles, then re-mark + re-recognize cleanly
+  $$("[data-sig-block]",tmp).forEach(n=>{ n.removeAttribute("data-sig-block"); n.removeAttribute("data-sig-role"); });
+  markBlocks(tmp);
+  recognizeRoles(tmp);
+  // ensure every marked block has a role (unknown -> "block") so structure is complete
+  $$("[data-sig-block]",tmp).forEach(n=>{ if(!n.getAttribute("data-sig-role")) n.setAttribute("data-sig-role","block"); });
+  state.html=tmp.innerHTML.trim();
+  harvestProfileFromDom();
+  snapshot(); renderAll(); persist();
+  toast("Tags normalized — design kept, roles made consistent");
+}
+
 /* ================================================================
    CONNECTION REVIEW modal (side-by-side)
    ================================================================ */
@@ -1824,10 +1892,12 @@ function openReviewModal(){
     </div>
     <div class="review-grid" style="margin-top:10px;">
       <div class="review-col"><h4>Fields</h4><div class="review-fields" id="rvFields"></div></div>
-      <div class="review-col"><h4>Design</h4><div class="review-preview" id="rvPreview"></div><div class="rv-boxlabel" id="rvBoxLabel"></div></div>
+      <div class="review-col"><h4>Design</h4><div class="review-preview" id="rvPreview"><div class="rv-boxlabel" id="rvBoxLabel"></div></div></div>
     </div>
   `, [ {label:"Normalize now", cls:"ghost", act:()=>{ normalizeInPlace(); closeModal(); }}, {label:"Done", cls:"", act:closeModal} ]);
   const prev=$("#rvPreview"); prev.innerHTML=cleanExportButKeepRoles();
+  // (re)create the floating label inside the (positioned) preview
+  const lbl=el("div",{class:"rv-boxlabel",id:"rvBoxLabel"}); prev.appendChild(lbl);
   renderReviewFields();
   // filter chips
   $$("#rvFilter .rv-chip").forEach(c=>c.addEventListener("click",()=>{ reviewFilter=c.getAttribute("data-f"); $$("#rvFilter .rv-chip").forEach(x=>x.classList.toggle("active",x===c)); renderReviewFields(); }));
@@ -1851,6 +1921,11 @@ function renderReviewFields(){
     const btn=el("button",{class:"btn ghost small", style:"flex:0 0 auto;"}, bound?"Re-connect":"Connect");
     btn.addEventListener("click",()=>startReviewConnect(d.key, btn));
     head.appendChild(btn);
+    if(bound){
+      const un=el("button",{class:"btn ghost small",title:"Disconnect",style:"flex:0 0 auto;color:var(--danger);border-color:var(--danger);"},"⦸");
+      un.addEventListener("click",()=>unlinkRoleInReview(d.key));
+      head.appendChild(un);
+    }
     row.appendChild(head);
     // FIELD -> DESIGN hover
     row.addEventListener("mouseenter",()=>{ const t=prev.querySelector(`[data-sig-role="${d.key}"]`); if(t){ t.classList.add("rv-mark"); showReviewBox(t, d.label, true);} });
@@ -1896,9 +1971,12 @@ function clearReviewHover(){
 function showReviewBox(target, label, ok){
   const box=$("#rvBoxLabel"); const prev=$("#rvPreview"); if(!box||!prev||!target) return;
   const pr=prev.getBoundingClientRect(); const tr=target.getBoundingClientRect();
+  // offsets relative to the (positioned) preview's content, accounting for scroll
+  const top = tr.top - pr.top + prev.scrollTop;
+  const left = tr.left - pr.left + prev.scrollLeft;
   box.textContent=label; box.className="rv-boxlabel show "+(ok?"ok":"warn");
-  box.style.left=(tr.left-pr.left+prev.scrollLeft)+"px";
-  box.style.top=Math.max(0,(tr.top-pr.top+prev.scrollTop-20))+"px";
+  box.style.left=Math.max(0,left)+"px";
+  box.style.top=Math.max(0,top-16)+"px";
 }
 function hideReviewBox(){ const box=$("#rvBoxLabel"); if(box) box.className="rv-boxlabel"; }
 
@@ -1915,6 +1993,20 @@ function startReviewConnect(key, btn){
   };
   prev.addEventListener("click",handler,true);
 }
+/* remove a role binding from inside the review preview */
+function unlinkRoleInReview(key){
+  const prev=$("#rvPreview");
+  prev.querySelectorAll(`[data-sig-role="${key}"]`).forEach(n=>n.removeAttribute("data-sig-role"));
+  state.html=prev.innerHTML;
+  // clear the now-unbound field value so it shows empty/not-linked
+  if(key in state.profile) state.profile[key]="";
+  const cf=(state.customFields||[]).find(f=>f.key===key); if(cf) cf.value="";
+  harvestProfileFromDom(); renderAll(); persist();
+  openReviewModal();
+  const def=ROLE_BY_KEY[key]||(state.customFields||[]).find(f=>f.key===key);
+  toast("Disconnected "+(def?def.label:key));
+}
+
 /* set a role on a preview element, adopt the edits, refresh everything */
 function assignRoleInPreview(key, elTight){
   const prev=$("#rvPreview");
@@ -1936,6 +2028,25 @@ function completeConnect(block){
   connectMode.active=false; connectMode.key=null;
   $("#connectBanner").classList.remove("show");
   connectRoleToBlock(key, block);
+}
+
+/* normalize choice modal: tag-only (keep design) vs full rebuild */
+function openNormalizeModal(){
+  setModal("Normalize structure", `
+    <p class="hint">Two ways to clean up the structure:</p>
+    <div class="checkbox-group" style="margin-top:12px;gap:10px;">
+      <button class="btn secondary" id="nmTags" style="text-align:left;padding:12px;">
+        <b>Normalize tags only (keep the design)</b><br>
+        <span style="color:var(--faint);font-weight:400;">Your layout stays exactly as-is. Only the role tags &amp; internal names are made consistent and complete, so the editor recognizes every section. Recommended.</span>
+      </button>
+      <button class="btn secondary" id="nmFull" style="text-align:left;padding:12px;">
+        <b>Rebuild to standard layout</b><br>
+        <span style="color:var(--faint);font-weight:400;">Recreates a clean classic/stacked layout from the detected values. Changes the look — use only if you want to start from a tidy template.</span>
+      </button>
+    </div>
+  `, [ {label:"Cancel", cls:"ghost", act:closeModal} ]);
+  $("#nmTags").addEventListener("click",()=>{ closeModal(); normalizeTagsInPlace(); });
+  $("#nmFull").addEventListener("click",()=>{ if(confirm("Rebuild will change the layout. Continue?")){ closeModal(); normalizeInPlace(); } });
 }
 
 /* ================================================================
@@ -2019,7 +2130,7 @@ function bindUI(){
   $$(".pill[data-device]").forEach(p=>p.addEventListener("click",()=>{ state.device=p.getAttribute("data-device"); applyDeviceBg(); persist(); }));
   $("#bgPill").addEventListener("click",()=>{ state.bg = state.bg==="dark"?"light":"dark"; applyDeviceBg(); persist(); });
   $("#editPill").addEventListener("click",()=>{ state.editMode=!state.editMode; applyDeviceBg(); });
-  $("#normalizePill").addEventListener("click",normalizeInPlace);
+  $("#normalizePill").addEventListener("click",openNormalizeModal);
   // raw toggle
   $("#btnToggleRaw").addEventListener("click",()=>{ state.rawOpen=!state.rawOpen; $("#rawPanel").classList.toggle("collapsed",!state.rawOpen); if(state.rawOpen) updateRawFromState(); });
   // header actions
