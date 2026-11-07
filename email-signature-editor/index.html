@@ -263,6 +263,10 @@
   /* drop indicator when reordering */
   .drop-line { height: 3px; background: var(--accent); border-radius: 2px; margin: 2px 0; box-shadow: 0 0 8px var(--accent); }
 
+  /* icons in the signature must never pick up editor hover/selection backgrounds */
+  .paper img.sig-line-icon, .paper [data-sig-role$="__icon"] { background: transparent !important; outline: none !important; box-shadow: none !important; }
+  .paper [data-sig-role$="__icon"] img { background: transparent !important; }
+
   /* collapsible section */
   .collapsible .collapse-head { cursor: pointer; user-select: none; }
   .collapsible .caret { display: inline-block; transition: transform .15s; font-size: 10px; }
@@ -415,6 +419,7 @@
     <button class="btn secondary small" id="btnImport">⇣ Import</button>
     <button class="btn secondary small" id="btnSaveMenu">⇧ Save / Export</button>
     <div class="hsep"></div>
+    <button class="btn ghost small" id="btnReset" title="Clear autosave / start fresh">↺ Reset</button>
     <button class="btn secondary small" id="btnToggleRaw">&lt;/&gt; HTML</button>
     <button class="btn small" id="btnCopy">Copy signature</button>
   </div>
@@ -1333,23 +1338,35 @@ function renderSocials(){
     });
     rm.addEventListener("click",()=>{ state.socials=state.socials.filter(x=>x.id!==l.id); snapshot(); renderSocials(); renderCanvas(); persist(); });
     wrap.appendChild(prev); wrap.appendChild(sel); wrap.appendChild(url); wrap.appendChild(rm);
-    // custom-icon URL row (only when type=custom or user wants an override)
+
+    // icon-image URL row — available for ANY type (override the default icon),
+    // plus drag-to-connect: drop an icon element from the design onto this row
     const custWrap=el("div",{style:"flex-basis:100%;"});
-    function renderSocialCustomRow(){
-      custWrap.innerHTML="";
-      if(l.type==="custom"){
-        const ci=el("input",{type:"url",placeholder:"custom icon image URL",value:esc(l.icon||""),style:"margin-top:6px;"});
-        ci.addEventListener("input",()=>{ l.icon=ci.value; refreshPrev(); snapshot(); renderCanvas(); persist(); });
-        custWrap.appendChild(ci);
-        const lbl=el("input",{type:"text",placeholder:"text label (if no icon)",value:esc(l.label||""),style:"margin-top:6px;"});
-        lbl.addEventListener("input",()=>{ l.label=lbl.value; snapshot(); renderCanvas(); persist(); });
-        custWrap.appendChild(lbl);
-      }
+    const ci=el("input",{type:"url",placeholder:"icon image URL (optional override)",value:esc(l.icon||""),style:"margin-top:6px;"});
+    ci.addEventListener("input",()=>{ l.icon=ci.value; refreshPrev(); snapshot(); renderCanvas(); persist(); });
+    custWrap.appendChild(ci);
+    if(l.type==="custom"){
+      const lbl=el("input",{type:"text",placeholder:"text label (if no icon)",value:esc(l.label||""),style:"margin-top:6px;"});
+      lbl.addEventListener("input",()=>{ l.label=lbl.value; snapshot(); renderCanvas(); persist(); });
+      custWrap.appendChild(lbl);
     }
-    renderSocialCustomRow();
+    custWrap.appendChild(el("div",{class:"hint",style:"margin-top:4px;"},"Tip: drag an icon image from the design onto this row to use it."));
     wrap.appendChild(custWrap);
+
+    // drop a dragged design image here -> use its src as this social's icon
+    wrap.addEventListener("dragover",ev=>{ if(draggedBlock||reviewDragEl){ ev.preventDefault(); wrap.classList.add("droptarget"); } });
+    wrap.addEventListener("dragleave",()=>wrap.classList.remove("droptarget"));
+    wrap.addEventListener("drop",ev=>{ ev.preventDefault(); wrap.classList.remove("droptarget");
+      const src=iconSrcFromDraggedEl(); if(src){ l.icon=src; ci.value=src; refreshPrev(); snapshot(); renderCanvas(); persist(); toast("Icon linked to "+(SOCIAL_TYPES[l.type]?SOCIAL_TYPES[l.type].label:l.type)); }
+    });
     host.appendChild(wrap);
   });
+}
+/* get the <img> src from whatever element is currently being dragged (canvas or review) */
+function iconSrcFromDraggedEl(){
+  const el2=draggedBlock||reviewDragEl; if(!el2) return "";
+  const img = el2.tagName==="IMG" ? el2 : (el2.querySelector && el2.querySelector("img"));
+  return img ? (img.getAttribute("src")||"") : "";
 }
 
 /* ================================================================
@@ -2259,7 +2276,8 @@ function openReviewModal(){
       <span class="rv-chip" data-f="unlinked">○ Not connected</span>
     </div>
     <div class="review-grid" style="margin-top:10px;">
-      <div class="review-col"><h4>Fields</h4><div class="review-fields" id="rvFields"></div></div>
+      <div class="review-col"><h4>Fields</h4><div class="review-fields" id="rvFields"></div>
+        <h4 style="margin-top:14px;">Social links</h4><div id="rvSocials"></div></div>
       <div class="review-col"><h4>Design</h4><div class="review-preview" id="rvPreview"></div></div>
     </div>
   `, [ {label:"Normalize now", cls:"ghost", act:()=>{ normalizeInPlace(); closeModal(); }}, {label:"Done", cls:"", act:closeModal} ]);
@@ -2267,6 +2285,7 @@ function openReviewModal(){
   // exactly ONE floating label inside the (positioned) preview
   prev.appendChild(el("div",{class:"rv-boxlabel",id:"rvBoxLabel"}));
   renderReviewFields();
+  renderReviewSocials();
   // filter chips
   $$("#rvFilter .rv-chip").forEach(c=>c.addEventListener("click",()=>{ reviewFilter=c.getAttribute("data-f"); $$("#rvFilter .rv-chip").forEach(x=>x.classList.toggle("active",x===c)); renderReviewFields(); }));
   // DESIGN -> FIELD hover: outline hovered element + light up its field, with a label box
@@ -2279,35 +2298,66 @@ function renderReviewFields(){
   const prev=$("#rvPreview"); const fields=$("#rvFields"); if(!fields) return;
   fields.innerHTML="";
   allFieldDefs().forEach(d=>{
-    const target=prev.querySelector(`[data-sig-role="${d.key}"]`);
-    const bound=!!target;
-    if(reviewFilter==="connected" && !bound) return;
-    if(reviewFilter==="unlinked" && bound) return;
-    const row=el("div",{class:"cfield compact"+(bound?" connected":""), "data-role":d.key});
-    const head=el("div",{class:"chead"});
-    head.appendChild(el("span",{class:"status"}));
-    head.appendChild(el("span",{class:"clabel"}, d.label));
-    head.appendChild(el("span",{class:"cbind"+(bound?"":" unbound")}, bound?"linked":"not linked"));
-    const btn=el("button",{class:"btn ghost small", style:"flex:0 0 auto;"}, bound?"Re-connect":"Connect");
-    btn.addEventListener("click",()=>startReviewConnect(d.key, btn));
-    head.appendChild(btn);
-    if(bound){
-      const un=el("button",{class:"btn ghost small",title:"Disconnect",style:"flex:0 0 auto;color:var(--danger);border-color:var(--danger);"},"⦸");
-      un.addEventListener("click",()=>unlinkRoleInReview(d.key));
-      head.appendChild(un);
+    const group=el("div",{class:"cgroup"});
+    group.appendChild(buildReviewRow(d, false, prev));
+    if(d.type!=="image" && roleCanHaveIcon(d.key, d.custom)){
+      group.appendChild(buildReviewRow(d, true, prev));
     }
-    row.appendChild(head);
-    // FIELD -> DESIGN hover
-    row.addEventListener("mouseenter",()=>{ const t=prev.querySelector(`[data-sig-role="${d.key}"]`); if(t){ t.classList.add("rv-mark"); showReviewBox(t, d.label, true);} });
-    row.addEventListener("mouseleave",()=>{ const t=prev.querySelector(`[data-sig-role="${d.key}"]`); if(t)t.classList.remove("rv-mark"); hideReviewBox(); });
-    // DRAG a design element onto this field to connect
-    row.addEventListener("dragover",ev=>{ ev.preventDefault(); row.classList.add("droptarget"); });
-    row.addEventListener("dragleave",()=>row.classList.remove("droptarget"));
-    row.addEventListener("drop",ev=>{ ev.preventDefault(); row.classList.remove("droptarget"); if(reviewDragEl){ assignRoleInPreview(d.key, reviewDragEl); } });
-    fields.appendChild(row);
+    fields.appendChild(group);
   });
-  // make design elements draggable for drag-to-connect
   enableReviewDragSources();
+}
+/* one review row — text row (isIcon=false) or paired icon row (isIcon=true) */
+function buildReviewRow(d, isIcon, prev){
+  const roleKey=isIcon? d.key+"__icon" : d.key;
+  const label=isIcon? (d.label+" icon") : d.label;
+  const target=prev.querySelector(`[data-sig-role="${roleKey}"]`);
+  const bound=!!target;
+  const row=el("div",{class:"cfield compact"+(bound?" connected":"")+(isIcon?" iconsub":""), "data-role":roleKey});
+  const head=el("div",{class:"chead"});
+  head.appendChild(el("span",{class:"status"}));
+  head.appendChild(el("span",{class:"clabel"}, (isIcon?"⬙ ":"")+label));
+  head.appendChild(el("span",{class:"cbind"+(bound?"":" unbound")}, bound?"linked":"not linked"));
+  const btn=el("button",{class:"btn ghost small", style:"flex:0 0 auto;"}, bound?"Re-connect":"Connect");
+  btn.addEventListener("click",()=>startReviewConnect(roleKey, btn));
+  head.appendChild(btn);
+  if(bound){
+    const un=el("button",{class:"btn ghost small",title:"Disconnect",style:"flex:0 0 auto;color:var(--danger);border-color:var(--danger);"},"⦸");
+    un.addEventListener("click",()=>unlinkRoleInReview(roleKey));
+    head.appendChild(un);
+  }
+  row.appendChild(head);
+  row.addEventListener("mouseenter",()=>{ const t=prev.querySelector(`[data-sig-role="${roleKey}"]`); if(t){ t.classList.add("rv-mark"); showReviewBox(t, label, true);} });
+  row.addEventListener("mouseleave",()=>{ const t=prev.querySelector(`[data-sig-role="${roleKey}"]`); if(t)t.classList.remove("rv-mark"); hideReviewBox(); });
+  row.addEventListener("dragover",ev=>{ ev.preventDefault(); row.classList.add("droptarget"); });
+  row.addEventListener("dragleave",()=>row.classList.remove("droptarget"));
+  row.addEventListener("drop",ev=>{ ev.preventDefault(); row.classList.remove("droptarget"); if(reviewDragEl){ assignRoleInPreview(roleKey, reviewDragEl); } });
+  return row;
+}
+/* social links in the review: type, url, icon preview + drag-an-icon-to-connect */
+function renderReviewSocials(){
+  const host=$("#rvSocials"); if(!host) return; host.innerHTML="";
+  if(!(state.socials||[]).length){ host.appendChild(el("p",{class:"hint"},"No social links detected.")); return; }
+  state.socials.forEach(l=>{
+    const wrap=el("div",{class:"iconbox",style:"flex-wrap:wrap;margin-bottom:8px;"});
+    const iconUrl=socialIconFor(l);
+    const prev=el("div",{class:"ic-prev"+(iconUrl?"":" empty")}, iconUrl?`<img src="${esc(iconUrl)}">`:"?");
+    const sel=el("select",{style:"flex:0 0 92px;"});
+    Object.keys(SOCIAL_TYPES).concat(["custom"]).forEach(t=>{ const o=el("option",{value:t}, t==="custom"?"Custom":SOCIAL_TYPES[t].label); if(t===l.type)o.setAttribute("selected",""); sel.appendChild(o); });
+    sel.value=l.type;
+    const url=el("input",{class:"ic-url",type:"text",placeholder:"URL",value:esc(l.url||"")});
+    const refresh=()=>{ const u=socialIconFor(l); prev.className="ic-prev"+(u?"":" empty"); prev.innerHTML=u?`<img src="${esc(u)}">`:"?"; };
+    sel.addEventListener("change",()=>{ l.type=sel.value; if(l.type!=="custom") delete l.icon; refresh(); snapshot(); renderCanvas(); persist(); });
+    url.addEventListener("input",()=>{ l.url=url.value; snapshot(); renderCanvas(); persist(); });
+    wrap.appendChild(prev); wrap.appendChild(sel); wrap.appendChild(url);
+    const ci=el("input",{type:"url",placeholder:"icon image URL — or drag an icon here",value:esc(l.icon||""),style:"flex-basis:100%;margin-top:6px;"});
+    ci.addEventListener("input",()=>{ l.icon=ci.value; refresh(); snapshot(); renderCanvas(); persist(); });
+    wrap.appendChild(ci);
+    wrap.addEventListener("dragover",ev=>{ if(reviewDragEl||draggedBlock){ ev.preventDefault(); wrap.classList.add("droptarget"); } });
+    wrap.addEventListener("dragleave",()=>wrap.classList.remove("droptarget"));
+    wrap.addEventListener("drop",ev=>{ ev.preventDefault(); wrap.classList.remove("droptarget"); const src=iconSrcFromDraggedEl(); if(src){ l.icon=src; ci.value=src; refresh(); snapshot(); renderCanvas(); persist(); toast("Icon linked"); } });
+    host.appendChild(wrap);
+  });
 }
 
 let reviewDragEl=null;
@@ -2423,6 +2473,44 @@ function openNormalizeModal(){
   `, [ {label:"Cancel", cls:"ghost", act:closeModal} ]);
   $("#nmTags").addEventListener("click",()=>{ closeModal(); normalizeTagsInPlace(); });
   $("#nmFull").addEventListener("click",()=>{ if(confirm("Rebuild will change the layout. Continue?")){ closeModal(); normalizeInPlace(); } });
+}
+
+/* ================================================================
+   RESET — clear autosave / session / everything
+   ================================================================ */
+function openResetModal(){
+  setModal("Reset / clear memory", `
+    <p class="hint">Old autosaved sessions can conflict with newer versions. Pick what to clear — this cannot be undone.</p>
+    <div class="checkbox-group" style="margin-top:12px;gap:10px;">
+      <button class="btn secondary" id="rsSession" style="text-align:left;padding:12px;">
+        <b>Start a fresh signature</b><br>
+        <span style="color:var(--faint);font-weight:400;">Clears the current autosave and loads the default starter. Keeps your saved templates.</span>
+      </button>
+      <button class="btn secondary" id="rsAll" style="text-align:left;padding:12px;color:#f0a;border-color:var(--danger);">
+        <b style="color:var(--danger)">Clear EVERYTHING (hard reset)</b><br>
+        <span style="color:var(--faint);font-weight:400;">Wipes autosave, saved templates, panel sizes and all editor memory from this browser. Full clean slate.</span>
+      </button>
+    </div>
+  `, [ {label:"Cancel", cls:"ghost", act:closeModal} ]);
+  $("#rsSession").addEventListener("click",()=>{ if(confirm("Clear current autosave and start fresh? (saved templates kept)")){ resetSession(false); closeModal(); } });
+  $("#rsAll").addEventListener("click",()=>{ if(confirm("Hard reset — wipe ALL editor memory in this browser?")){ resetSession(true); closeModal(); } });
+}
+function resetSession(hard){
+  try{
+    localStorage.removeItem(LS_KEY);
+    localStorage.removeItem("sig-panels");
+    if(hard){ localStorage.removeItem(LS_TPL); }
+  }catch(e){}
+  // reset in-memory state to defaults
+  state.profile=deepClone(DEFAULT_PROFILE);
+  state.socials=deepClone(DEFAULT_SOCIALS);
+  state.style=deepClone(DEFAULT_STYLE);
+  state.customFields=[]; state.lineIcons={};
+  state.html=""; state.bg="light"; state.device="desktop";
+  state.showLabels=false; state.showBoxes=false;
+  history.stack=[]; history.index=-1;
+  renderAll(); applyDeviceBg(); snapshot(); updateUndoButtons();
+  toast(hard?"Everything cleared — clean slate":"Fresh signature started");
 }
 
 /* ================================================================
@@ -2559,6 +2647,7 @@ function bindUI(){
   // header actions
   $("#btnImport").addEventListener("click",openImportModal);
   $("#btnSaveMenu").addEventListener("click",openSaveModal);
+  $("#btnReset").addEventListener("click",openResetModal);
   $("#btnCopy").addEventListener("click",copySignature);
   $("#btnUndo").addEventListener("click",undo);
   $("#btnRedo").addEventListener("click",redo);
