@@ -3,745 +3,1734 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Email Signature Editor</title>
+<title>Email Signature Builder</title>
 <style>
   :root {
-    --bg: #0f1221;
-    --panel: #171a2b;
-    --panel-2: #1f2338;
-    --border: #2b3050;
-    --text: #e7e9f3;
+    --bg: #0e1120;
+    --panel: #161a2c;
+    --panel-2: #1e2339;
+    --panel-3: #262c47;
+    --border: #2c3254;
+    --border-2: #3a4169;
+    --text: #e8eaf5;
     --muted: #9aa0bd;
+    --faint: #6b7196;
     --accent: #6c8cff;
     --accent-2: #4f6fe0;
     --good: #35c08a;
+    --good-dim: #1e6b4d;
+    --warn: #e6b34d;
     --danger: #e0635a;
     --radius: 10px;
-    --shadow: 0 6px 24px rgba(0,0,0,.35);
+    --shadow: 0 8px 30px rgba(0,0,0,.4);
+    /* syntax colors */
+    --syn-tag: #7aa2ff;
+    --syn-attr: #c792ea;
+    --syn-str: #c3e88d;
+    --syn-com: #5c6283;
+    --syn-txt: #d7dbf0;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
+  html, body { height: 100%; margin: 0; }
   body {
-    margin: 0;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
+    background: var(--bg); color: var(--text); overflow: hidden;
+    font-size: 13px;
   }
+  button { font-family: inherit; }
+
+  /* ---------- Header ---------- */
   header {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 16px; padding: 14px 20px;
-    background: linear-gradient(180deg, #1a1e33, #141728);
-    border-bottom: 1px solid var(--border);
-    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 14px; height: 52px; padding: 0 16px;
+    background: linear-gradient(180deg, #1a1f36, #13172a);
+    border-bottom: 1px solid var(--border); position: relative; z-index: 30;
   }
-  header h1 { font-size: 16px; margin: 0; letter-spacing: .3px; font-weight: 650; }
-  header .sub { color: var(--muted); font-size: 12px; margin-left: 10px; }
-  .layout {
-    display: grid;
-    grid-template-columns: 420px 1fr;
-    min-height: calc(100vh - 56px);
-  }
-  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  header h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: .2px; white-space: nowrap; }
+  header .brand { font-size: 17px; }
+  .spacer { flex: 1; }
+  .hgroup { display: flex; gap: 6px; align-items: center; }
+  .hsep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
 
-  .editor { border-right: 1px solid var(--border); padding: 18px; overflow-y: auto; }
-  .preview-wrap { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
-
-  .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
-  .tab {
-    background: var(--panel); border: 1px solid var(--border); color: var(--muted);
-    padding: 7px 12px; border-radius: 999px; font-size: 12.5px; cursor: pointer; user-select: none;
-  }
-  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-
-  .section { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; }
-  .section h2 { margin: 0 0 12px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; font-weight: 650; }
-
-  .field { margin-bottom: 11px; }
-  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
-  .row { display: flex; gap: 10px; }
-  .row > .field { flex: 1; }
-  input[type="text"], input[type="url"], input[type="email"], input[type="number"], select, textarea {
-    width: 100%; background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
-    border-radius: 8px; padding: 9px 10px; font-size: 13px; font-family: inherit;
-  }
-  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,140,255,.2); }
-  input[type="color"] { width: 42px; height: 36px; padding: 2px; border: 1px solid var(--border); background: var(--panel-2); border-radius: 8px; cursor: pointer; }
-  .color-row { display: flex; align-items: center; gap: 8px; }
-  .color-row input[type="text"] { flex: 1; }
-  textarea { min-height: 120px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.5; }
-
+  /* ---------- Buttons ---------- */
   .btn {
     background: var(--accent); color: #fff; border: none; border-radius: 8px;
-    padding: 9px 14px; font-size: 13px; cursor: pointer; font-weight: 600;
+    padding: 8px 13px; font-size: 12.5px; cursor: pointer; font-weight: 600; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px;
   }
   .btn:hover { background: var(--accent-2); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
   .btn.secondary { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); font-weight: 500; }
-  .btn.secondary:hover { border-color: var(--accent); }
-  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .btn.secondary:hover { border-color: var(--accent); background: var(--panel-3); }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); font-weight: 500; }
+  .btn.ghost:hover { border-color: var(--accent); color: var(--text); }
   .btn.small { padding: 6px 10px; font-size: 12px; }
-  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn.icon { padding: 7px 9px; }
+  .btn.good { background: var(--good); color: #042a1c; }
 
-  .links-list { display: flex; flex-direction: column; gap: 8px; }
-  .link-item { display: flex; gap: 8px; align-items: center; }
-  .link-item select { flex: 0 0 120px; }
-  .link-item input { flex: 1; }
-  .link-item .remove { flex: 0 0 auto; background: transparent; border: 1px solid var(--border); color: var(--danger); border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 16px; }
-
-  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .device-toggle { display: flex; gap: 6px; }
-  .pill { font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
-  .pill.active { color: #fff; border-color: var(--accent); background: var(--accent); }
-
-  .preview-frame {
-    background: #ffffff; border-radius: var(--radius); box-shadow: var(--shadow);
-    padding: 28px; overflow: auto; flex: 1; min-height: 240px; transition: max-width .2s ease; width: 100%;
+  /* ---------- Main layout ---------- */
+  .app { display: flex; height: calc(100vh - 52px); }
+  .sidebar {
+    width: 340px; min-width: 260px; background: var(--panel); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden;
   }
-  .preview-frame.mobile { max-width: 380px; }
+  .center { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 320px; }
+  .rawpanel {
+    width: 440px; min-width: 0; background: #0b0e1a; border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden; transition: width .18s ease;
+  }
+  .rawpanel.collapsed { width: 0; min-width: 0; border-left: none; }
 
-  .code-box { position: relative; }
-  .code-box textarea { min-height: 220px; }
-  .hint { font-size: 11.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  /* ---------- Sidebar tabs ---------- */
+  .side-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--panel-2); }
+  .side-tab {
+    flex: 1; text-align: center; padding: 10px 4px; font-size: 11.5px; color: var(--muted);
+    cursor: pointer; border-bottom: 2px solid transparent; user-select: none; font-weight: 600;
+  }
+  .side-tab:hover { color: var(--text); }
+  .side-tab.active { color: #fff; border-bottom-color: var(--accent); background: var(--panel); }
+  .side-body { flex: 1; overflow-y: auto; padding: 14px; }
+  .side-pane { display: none; }
+  .side-pane.active { display: block; }
+
+  /* ---------- Sections / fields ---------- */
+  .section { background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
+  .section > h3 {
+    margin: 0 0 10px; font-size: 11px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .6px; font-weight: 700; display: flex; align-items: center; gap: 6px;
+  }
+  .field { margin-bottom: 10px; }
+  .field:last-child { margin-bottom: 0; }
+  .field > label { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 5px; }
+  .row2 { display: flex; gap: 8px; }
+  .row2 > * { flex: 1; min-width: 0; }
+  input[type=text], input[type=url], input[type=email], input[type=number], select, textarea {
+    width: 100%; background: var(--panel-3); border: 1px solid var(--border); color: var(--text);
+    border-radius: 7px; padding: 8px 9px; font-size: 12.5px; font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,140,255,.18); }
+  input::placeholder, textarea::placeholder { color: var(--faint); }
+  select { cursor: pointer; }
+
+  /* ---------- Connectable field (left profile rows) ---------- */
+  .cfield { position: relative; border: 1px solid var(--border); border-radius: 8px; padding: 9px; margin-bottom: 9px; background: var(--panel-2); transition: border-color .12s, box-shadow .12s; }
+  .cfield.droptarget { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,140,255,.3); }
+  .cfield.highlight { border-color: var(--good); box-shadow: 0 0 0 2px rgba(53,192,138,.35); }
+  .cfield .chead { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
+  .cfield .status { width: 10px; height: 10px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; }
+  .cfield.connected .status { background: var(--good); box-shadow: 0 0 6px rgba(53,192,138,.6); }
+  .cfield .clabel { font-size: 12px; font-weight: 600; color: var(--text); flex: 1; }
+  .cfield .ctype { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: .4px; }
+  .cfield .cbind { font-size: 10px; color: var(--good); }
+  .cfield .cbind.unbound { color: var(--warn); }
+  .cfield .unlink { background: transparent; border: none; color: var(--faint); cursor: pointer; font-size: 13px; padding: 2px 4px; }
+  .cfield .unlink:hover { color: var(--danger); }
+
+  /* ---------- Palette (add elements) ---------- */
+  .palette { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pal-item {
+    background: var(--panel-3); border: 1px solid var(--border); border-radius: 8px; padding: 10px 8px;
+    text-align: center; cursor: grab; font-size: 11.5px; color: var(--text); user-select: none;
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+  }
+  .pal-item:hover { border-color: var(--accent); background: var(--panel-2); }
+  .pal-item:active { cursor: grabbing; }
+  .pal-item .ic { font-size: 18px; }
+
+  /* ---------- Color / style menu ---------- */
+  .color-row { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 34px; height: 30px; border-radius: 7px; border: 1px solid var(--border-2); cursor: pointer; flex: 0 0 auto; padding: 0; }
+  .color-row input[type=text] { flex: 1; font-family: ui-monospace, monospace; }
+  .eyedrop { background: var(--panel-3); border: 1px solid var(--border); border-radius: 7px; width: 32px; height: 30px; cursor: pointer; color: var(--muted); font-size: 14px; flex: 0 0 auto; }
+  .eyedrop:hover { border-color: var(--accent); color: var(--text); }
+  .checkrow { display: flex; align-items: center; gap: 8px; }
+  .checkrow input { width: auto; }
+  .checkrow label { margin: 0; font-size: 12px; color: var(--text); }
+  .slider-row { display: flex; align-items: center; gap: 10px; }
+  .slider-row input[type=range] { flex: 1; accent-color: var(--accent); }
+  .slider-row .val { font-size: 11px; color: var(--muted); width: 42px; text-align: right; font-family: ui-monospace, monospace; }
+
+  /* ---------- Center toolbar ---------- */
+  .ctoolbar {
+    display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--border);
+    background: var(--panel-2); flex-wrap: wrap;
+  }
+  .pill { font-size: 11.5px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 5px 11px; cursor: pointer; user-select: none; background: var(--panel); }
+  .pill:hover { color: var(--text); }
+  .pill.active { color: #fff; border-color: var(--accent); background: var(--accent); }
+  .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+  .seg .pill { border: none; border-radius: 0; background: transparent; }
+  .seg .pill.active { background: var(--accent); }
+
+  /* ---------- Canvas / stage ---------- */
+  .stage {
+    flex: 1; overflow: auto; padding: 36px; display: flex; justify-content: center; align-items: flex-start;
+    background: #0c0f1c
+      linear-gradient(rgba(255,255,255,.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.015) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  .canvas-shell { transition: all .2s ease; }
+  /* desktop */
+  .canvas-shell.desktop .paper { width: 640px; }
+  /* mobile phone frame */
+  .canvas-shell.mobile {
+    width: 360px; padding: 14px; background: #1b1e2e; border-radius: 42px;
+    box-shadow: 0 0 0 2px #2a2f45, 0 20px 60px rgba(0,0,0,.6); position: relative;
+  }
+  .canvas-shell.mobile::before {
+    content: ""; position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 22px; background: #0c0f1c; border-radius: 0 0 14px 14px; z-index: 5;
+  }
+  .canvas-shell.mobile .paper { width: 332px; border-radius: 30px; padding-top: 34px; min-height: 480px; }
+  .canvas-shell.mobile::after {
+    content: ""; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 4px; background: #3a4060; border-radius: 3px;
+  }
+  .paper {
+    background: #ffffff; color: #111; border-radius: 6px; padding: 28px; min-height: 260px;
+    box-shadow: var(--shadow); transition: background .15s; position: relative;
+  }
+  .paper.darkbg { background: #1c1c24; }
+
+  /* ---------- Editor block chrome (only in edit mode) ---------- */
+  .editing [data-sig-block] { position: relative; outline: 1px dashed transparent; transition: outline-color .1s; }
+  .editing [data-sig-block]:hover { outline-color: rgba(108,140,255,.5); }
+  .editing [data-sig-block].selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .editing [data-sig-block].connecting { outline: 2px dashed var(--good) !important; }
+  .blocktag {
+    position: absolute; top: -9px; left: -1px; background: var(--accent); color: #fff; font-size: 9px;
+    padding: 1px 6px; border-radius: 4px 4px 0 0; display: none; z-index: 6; font-weight: 700; letter-spacing: .3px;
+    text-transform: uppercase; pointer-events: none;
+  }
+  .editing [data-sig-block].selected > .blocktag { display: block; }
+  .block-toolbar {
+    position: absolute; top: -11px; right: -1px; display: none; gap: 2px; z-index: 7;
+  }
+  .editing [data-sig-block].selected > .block-toolbar { display: flex; }
+  .block-toolbar button {
+    background: var(--accent); color: #fff; border: none; width: 20px; height: 18px; font-size: 11px;
+    cursor: pointer; border-radius: 3px; display: flex; align-items: center; justify-content: center; line-height: 1;
+  }
+  .block-toolbar button:hover { background: var(--accent-2); }
+
+  /* resize handles */
+  .rz-handle { position: absolute; width: 11px; height: 11px; background: var(--accent); border: 2px solid #fff; border-radius: 2px; z-index: 8; display: none; }
+  .editing [data-sig-block].selected > .rz-handle { display: block; }
+  .rz-se { right: -6px; bottom: -6px; cursor: se-resize; }
+  .rz-e  { right: -6px; top: 50%; transform: translateY(-50%); cursor: e-resize; }
+  .rz-s  { bottom: -6px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+
+  /* drop indicator when reordering */
+  .drop-line { height: 3px; background: var(--accent); border-radius: 2px; margin: 2px 0; box-shadow: 0 0 8px var(--accent); }
+
+  /* connect-mode banner */
+  .connect-banner {
+    display: none; align-items: center; gap: 10px; padding: 8px 14px; background: var(--good-dim);
+    color: #d6ffe9; font-size: 12px; border-bottom: 1px solid var(--good);
+  }
+  .connect-banner.show { display: flex; }
+
+  /* ---------- Raw panel ---------- */
+  .raw-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--border); background: #0f1322; }
+  .raw-head .ttl { font-size: 12px; font-weight: 600; color: var(--muted); flex: 1; }
+  .raw-wrap { flex: 1; position: relative; overflow: hidden; }
+  .raw-editor, .raw-hl {
+    margin: 0; border: 0; position: absolute; inset: 0; padding: 12px 14px; overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.55;
+    white-space: pre-wrap; word-break: break-word; tab-size: 2;
+  }
+  .raw-editor {
+    background: transparent; color: transparent; caret-color: #fff; resize: none; z-index: 2;
+  }
+  .raw-editor:focus { outline: none; }
+  .raw-hl { z-index: 1; pointer-events: none; color: var(--syn-txt); background: #0b0e1a; }
+  .raw-hl .t-tag { color: var(--syn-tag); }
+  .raw-hl .t-attr { color: var(--syn-attr); }
+  .raw-hl .t-str { color: var(--syn-str); }
+  .raw-hl .t-com { color: var(--syn-com); font-style: italic; }
+  .raw-foot { padding: 7px 12px; border-top: 1px solid var(--border); background: #0f1322; display: flex; gap: 8px; align-items: center; }
+  .raw-foot .msg { font-size: 11px; color: var(--faint); flex: 1; }
+  .raw-foot .msg.err { color: var(--danger); }
+  .raw-foot .msg.ok { color: var(--good); }
+
+  /* ---------- Modal ---------- */
+  .modal-back {
+    position: fixed; inset: 0; background: rgba(6,8,16,.72); backdrop-filter: blur(3px);
+    display: none; align-items: center; justify-content: center; z-index: 100; padding: 24px;
+  }
+  .modal-back.show { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border-2); border-radius: 14px; box-shadow: var(--shadow);
+    width: 100%; max-width: 920px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .modal-head { padding: 15px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .modal-head h2 { margin: 0; font-size: 15px; }
+  .modal-head .close { margin-left: auto; background: transparent; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+  .modal-body { padding: 18px; overflow-y: auto; }
+  .modal-foot { padding: 13px 18px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* connection review grid */
+  .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .review-grid { grid-template-columns: 1fr; } }
+  .review-col h4 { margin: 0 0 10px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .review-preview { background: #fff; border-radius: 8px; padding: 18px; max-height: 420px; overflow: auto; }
+  .review-fields { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow: auto; padding-right: 4px; }
+  .rv-mark { outline: 2px solid var(--good) !important; outline-offset: 1px; background: rgba(53,192,138,.12); }
+
+  .hint { font-size: 11px; color: var(--faint); line-height: 1.5; margin: 6px 0 0; }
+  .warnbox { background: rgba(230,179,77,.1); border: 1px solid rgba(230,179,77,.35); color: #f0cd84; border-radius: 8px; padding: 9px 11px; font-size: 11.5px; line-height: 1.5; margin-top: 8px; }
+
   .toast {
     position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px);
-    background: var(--good); color: #04281b; padding: 10px 18px; border-radius: 999px;
-    font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: all .25s ease; z-index: 50;
+    background: var(--good); color: #042a1c; padding: 10px 18px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 600; opacity: 0; pointer-events: none; transition: all .25s; z-index: 200;
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .checkbox-row { display: flex; align-items: center; gap: 8px; }
-  .checkbox-row input { width: auto; }
-  .img-preview { margin-top: 8px; }
-  .img-preview img { max-height: 70px; border-radius: 6px; border: 1px solid var(--border); background: #fff; }
-  .tab-pane { display: none; }
-  .tab-pane.active { display: block; }
-  .template-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .template-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; cursor: pointer; font-size: 12px; text-align: center; }
-  .template-card:hover { border-color: var(--accent); }
+  .toast.err { background: var(--danger); color: #fff; }
+
+  .tpl-list { display: flex; flex-direction: column; gap: 7px; }
+  .tpl-item { display: flex; align-items: center; gap: 8px; background: var(--panel-3); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .tpl-item.active { border-color: var(--accent); }
+  .tpl-item .nm { flex: 1; font-size: 12.5px; cursor: pointer; }
+  .tpl-item .mini { background: transparent; border: none; color: var(--faint); cursor: pointer; font-size: 13px; padding: 2px 4px; }
+  .tpl-item .mini:hover { color: var(--text); }
+
+  .file-drop { border: 1.5px dashed var(--border-2); border-radius: 10px; padding: 20px; text-align: center; color: var(--muted); font-size: 12px; cursor: pointer; }
+  .file-drop:hover, .file-drop.over { border-color: var(--accent); color: var(--text); background: var(--panel-2); }
+  textarea.paste-area { min-height: 150px; font-family: ui-monospace, monospace; font-size: 12px; }
+
+  .badge { font-size: 9px; background: var(--accent); color: #fff; border-radius: 4px; padding: 1px 5px; font-weight: 700; }
+  .kbd { font-family: ui-monospace, monospace; font-size: 10px; background: var(--panel-3); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--muted); }
+  .checkbox-group { display: flex; flex-direction: column; gap: 7px; }
 </style>
 </head>
 <body>
 <header>
-  <div>
-    <h1>✉️ Email Signature Editor <span class="sub">table-based HTML · inline styles · paste-ready</span></h1>
+  <span class="brand">✉️</span>
+  <h1>Email Signature Builder</h1>
+  <div class="hgroup">
+    <button class="btn ghost small" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
+    <button class="btn ghost small" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
   </div>
-  <div class="btn-row">
-    <button class="btn secondary small" id="btnReset">Reset</button>
-    <button class="btn small" id="btnCopyTop">Copy signature</button>
+  <div class="spacer"></div>
+  <div class="hgroup">
+    <button class="btn secondary small" id="btnImport">⇣ Import</button>
+    <button class="btn secondary small" id="btnSaveMenu">⇧ Save / Export</button>
+    <div class="hsep"></div>
+    <button class="btn secondary small" id="btnToggleRaw">&lt;/&gt; HTML</button>
+    <button class="btn small" id="btnCopy">Copy signature</button>
   </div>
 </header>
 
-<div class="layout">
-  <!-- ======================= EDITOR ======================= -->
-  <div class="editor">
-    <div class="tabs">
-      <div class="tab active" data-tab="details">Details</div>
-      <div class="tab" data-tab="style">Style</div>
-      <div class="tab" data-tab="links">Links</div>
-      <div class="tab" data-tab="code">HTML</div>
+<div class="app">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="side-tabs">
+      <div class="side-tab active" data-tab="content">Content</div>
+      <div class="side-tab" data-tab="elements">Add</div>
+      <div class="side-tab" data-tab="style">Style</div>
+      <div class="side-tab" data-tab="templates">Templates</div>
     </div>
-
-    <!-- DETAILS -->
-    <div class="tab-pane active" data-pane="details">
-      <div class="section">
-        <h2>Templates</h2>
-        <div class="template-grid">
-          <div class="template-card" data-template="classic">Classic (photo left)</div>
-          <div class="template-card" data-template="stacked">Stacked (no photo)</div>
-          <div class="template-card" data-template="divider">Vertical divider</div>
-          <div class="template-card" data-template="logo">Logo + accent bar</div>
+    <div class="side-body">
+      <!-- CONTENT / PROFILE + connections -->
+      <div class="side-pane active" data-pane="content">
+        <div class="section">
+          <h3>Profile fields <span class="badge" id="connCount">0/0</span></h3>
+          <p class="hint">Edit values here; they update the design live. If a pasted template isn't wired up, drag an element from the canvas onto a field to connect it. Hover a field to highlight its linked element.</p>
+          <div id="fieldsHost" style="margin-top:10px;"></div>
+          <button class="btn ghost small" id="btnAddField" style="margin-top:8px;">+ Custom field</button>
+        </div>
+        <div class="section">
+          <h3>Social links</h3>
+          <div id="socialHost"></div>
+          <button class="btn ghost small" id="btnAddSocial" style="margin-top:8px;">+ Add social link</button>
         </div>
       </div>
 
-      <div class="section">
-        <h2>Person</h2>
-        <div class="field"><label>Full name</label><input type="text" data-field="name" /></div>
-        <div class="field"><label>Job title</label><input type="text" data-field="title" /></div>
-        <div class="field"><label>Company</label><input type="text" data-field="company" /></div>
-        <div class="field"><label>Tagline / department (optional)</label><input type="text" data-field="tagline" /></div>
-      </div>
-
-      <div class="section">
-        <h2>Contact</h2>
-        <div class="row">
-          <div class="field"><label>Phone</label><input type="text" data-field="phone" /></div>
-          <div class="field"><label>Mobile</label><input type="text" data-field="mobile" /></div>
-        </div>
-        <div class="field"><label>Email</label><input type="email" data-field="email" /></div>
-        <div class="field"><label>Website</label><input type="url" data-field="website" /></div>
-        <div class="field"><label>Address (optional)</label><input type="text" data-field="address" /></div>
-      </div>
-
-      <div class="section">
-        <h2>Image</h2>
-        <div class="field">
-          <label>Image URL (photo or logo)</label>
-          <input type="url" data-field="imageUrl" placeholder="https://… (use a hosted URL for email)" />
-        </div>
-        <div class="field">
-          <label>Or upload (embeds as data URI — see note)</label>
-          <input type="file" id="imageUpload" accept="image/*" />
-        </div>
-        <div class="row">
-          <div class="field"><label>Width (px)</label><input type="number" data-field="imageWidth" min="20" max="400" /></div>
-          <div class="field">
-            <label>Shape</label>
-            <select data-field="imageShape">
-              <option value="square">Square</option>
-              <option value="round">Rounded</option>
-              <option value="circle">Circle</option>
-            </select>
+      <!-- ADD ELEMENTS -->
+      <div class="side-pane" data-pane="elements">
+        <div class="section">
+          <h3>Drag onto the canvas</h3>
+          <p class="hint">Drag any element into the signature. Drop between existing blocks to position it.</p>
+          <div class="palette" id="palette" style="margin-top:10px;">
+            <div class="pal-item" draggable="true" data-add="text"><span class="ic">🅣</span>Text</div>
+            <div class="pal-item" draggable="true" data-add="heading"><span class="ic">H</span>Heading</div>
+            <div class="pal-item" draggable="true" data-add="image"><span class="ic">🖼️</span>Image / GIF</div>
+            <div class="pal-item" draggable="true" data-add="button"><span class="ic">⬢</span>Button</div>
+            <div class="pal-item" draggable="true" data-add="social"><span class="ic">🔗</span>Social row</div>
+            <div class="pal-item" draggable="true" data-add="divider"><span class="ic">―</span>Divider</div>
+            <div class="pal-item" draggable="true" data-add="spacer"><span class="ic">↕</span>Spacer</div>
+            <div class="pal-item" draggable="true" data-add="table"><span class="ic">▦</span>Table</div>
+            <div class="pal-item" draggable="true" data-add="columns"><span class="ic">◫</span>2 Columns</div>
+            <div class="pal-item" draggable="true" data-add="html"><span class="ic">&lt;/&gt;</span>Raw HTML</div>
           </div>
         </div>
-        <div class="img-preview" id="imgPreview"></div>
-        <p class="hint">⚠️ Uploaded images embed as base64 data URIs. Many email clients (esp. Outlook & Gmail) block these. For reliable delivery, host the image and paste its public URL.</p>
-      </div>
-    </div>
-
-    <!-- STYLE -->
-    <div class="tab-pane" data-pane="style">
-      <div class="section">
-        <h2>Typography</h2>
-        <div class="field">
-          <label>Font family</label>
-          <select data-field="fontFamily">
-            <option value="Arial, Helvetica, sans-serif">Arial</option>
-            <option value="Helvetica, Arial, sans-serif">Helvetica</option>
-            <option value="Georgia, 'Times New Roman', serif">Georgia</option>
-            <option value="'Trebuchet MS', Verdana, sans-serif">Trebuchet MS</option>
-            <option value="Verdana, Geneva, sans-serif">Verdana</option>
-            <option value="Tahoma, Verdana, sans-serif">Tahoma</option>
-            <option value="'Courier New', Courier, monospace">Courier New</option>
-          </select>
-        </div>
-        <div class="row">
-          <div class="field"><label>Base size (px)</label><input type="number" data-field="fontSize" min="10" max="20" /></div>
-          <div class="field"><label>Name size (px)</label><input type="number" data-field="nameSize" min="12" max="30" /></div>
+        <div class="section">
+          <h3>Selected element</h3>
+          <div id="inspectorHost"><p class="hint">Select an element on the canvas to edit it here.</p></div>
         </div>
       </div>
-      <div class="section">
-        <h2>Colors</h2>
-        <div class="field"><label>Text</label><div class="color-row"><input type="color" data-color="textColor" /><input type="text" data-field="textColor" /></div></div>
-        <div class="field"><label>Name</label><div class="color-row"><input type="color" data-color="nameColor" /><input type="text" data-field="nameColor" /></div></div>
-        <div class="field"><label>Accent (links, divider, bar)</label><div class="color-row"><input type="color" data-color="accentColor" /><input type="text" data-field="accentColor" /></div></div>
-        <div class="field"><label>Muted (title, labels)</label><div class="color-row"><input type="color" data-color="mutedColor" /><input type="text" data-field="mutedColor" /></div></div>
-      </div>
-      <div class="section">
-        <h2>Options</h2>
-        <div class="field checkbox-row"><input type="checkbox" data-field="showLabels" /><label style="margin:0;">Show field labels (P: / M: / E:)</label></div>
-        <div class="field checkbox-row"><input type="checkbox" data-field="showDivider" /><label style="margin:0;">Show divider line above signature</label></div>
-        <div class="field"><label>Spacing between rows (px)</label><input type="number" data-field="rowSpacing" min="0" max="12" /></div>
-      </div>
-    </div>
 
-    <!-- LINKS -->
-    <div class="tab-pane" data-pane="links">
-      <div class="section">
-        <h2>Social & custom links</h2>
-        <div class="links-list" id="linksList"></div>
-        <div style="margin-top:12px;"><button class="btn secondary small" id="btnAddLink">+ Add link</button></div>
-        <p class="hint">Icons use hosted SVG badges. Choose a type or pick "Custom" for a text link.</p>
+      <!-- STYLE -->
+      <div class="side-pane" data-pane="style">
+        <div id="styleHost"></div>
       </div>
-    </div>
 
-    <!-- CODE -->
-    <div class="tab-pane" data-pane="code">
-      <div class="section">
-        <h2>Raw HTML (editable)</h2>
-        <div class="code-box">
-          <textarea id="codeArea" spellcheck="false"></textarea>
+      <!-- TEMPLATES -->
+      <div class="side-pane" data-pane="templates">
+        <div class="section">
+          <h3>Starter layouts</h3>
+          <div class="palette" id="starterHost"></div>
         </div>
-        <div class="btn-row" style="margin-top:10px;">
-          <button class="btn secondary small" id="btnApplyCode">Apply HTML → preview</button>
-          <button class="btn ghost small" id="btnRegen">Regenerate from form</button>
+        <div class="section">
+          <h3>My templates</h3>
+          <div class="tpl-list" id="tplList"></div>
+          <div class="row2" style="margin-top:10px;">
+            <input type="text" id="tplName" placeholder="Template name" />
+            <button class="btn small" id="btnSaveTpl" style="flex:0 0 auto;">Save current</button>
+          </div>
+          <p class="hint">Switching templates keeps your profile (name, photo, org, socials…) and re-applies it.</p>
         </div>
-        <p class="hint">Edit the HTML directly for full control (add tables, cells, etc.). "Apply" renders your edits in the preview. "Regenerate" rebuilds from the form fields (discards manual edits).</p>
       </div>
     </div>
-  </div>
+  </aside>
 
-  <!-- ======================= PREVIEW ======================= -->
-  <div class="preview-wrap">
-    <div class="toolbar">
-      <div class="device-toggle">
+  <!-- ============ CENTER / CANVAS ============ -->
+  <main class="center">
+    <div class="ctoolbar">
+      <div class="seg">
         <span class="pill active" data-device="desktop">🖥 Desktop</span>
         <span class="pill" data-device="mobile">📱 Mobile</span>
       </div>
-      <span class="pill" id="bgToggle" data-bg="light">◻️ Light bg</span>
-      <div style="flex:1;"></div>
-      <button class="btn secondary small" id="btnCopyHtml">Copy HTML</button>
-      <button class="btn secondary small" id="btnDownload">Download .html</button>
-      <button class="btn small" id="btnCopy">Copy signature (rich)</button>
+      <span class="pill" id="bgPill" data-bg="light">◻ Light</span>
+      <span class="pill active" id="editPill" title="Toggle edit chrome">✎ Edit mode</span>
+      <div class="spacer" style="flex:1;"></div>
+      <span class="pill" id="normalizePill" title="Rewrite to clean standard structure">⟳ Normalize</span>
+      <span class="hint" id="healthHint"></span>
     </div>
-    <div class="preview-frame" id="previewFrame">
-      <div id="previewContent"></div>
+    <div class="connect-banner" id="connectBanner">
+      <span>🔗 Connect mode: click an element in the canvas to link it to <b id="connectFieldName"></b></span>
+      <button class="btn ghost small" id="connectCancel" style="margin-left:auto;">Cancel</button>
     </div>
-    <p class="hint">
-      <b>How to use it:</b> Click <b>Copy signature (rich)</b>, then paste into Gmail Settings → Signature, Outlook → Signatures,
-      or Apple Mail. Use <b>Copy HTML</b> if your client has a "paste HTML / source" option.
-    </p>
+    <div class="stage" id="stage">
+      <div class="canvas-shell desktop editing" id="canvasShell">
+        <div class="paper" id="paper"></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============ RAW HTML PANEL ============ -->
+  <aside class="rawpanel collapsed" id="rawPanel">
+    <div class="raw-head">
+      <span class="ttl">Raw HTML <span class="hint" style="font-weight:400;">· two-way live sync</span></span>
+      <button class="btn ghost small" id="btnFormatHtml">Format</button>
+    </div>
+    <div class="raw-wrap">
+      <pre class="raw-hl" id="rawHl" aria-hidden="true"></pre>
+      <textarea class="raw-editor" id="rawEditor" spellcheck="false"></textarea>
+    </div>
+    <div class="raw-foot">
+      <span class="msg" id="rawMsg">Edit here — changes apply to the design live.</span>
+    </div>
+  </aside>
+</div>
+
+<!-- ============ MODALS ============ -->
+<div class="modal-back" id="modalBack">
+  <div class="modal" id="modal">
+    <div class="modal-head">
+      <h2 id="modalTitle">Title</h2>
+      <button class="close" id="modalClose">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
+<input type="file" id="hiddenFile" style="display:none" />
 
 <script>
+"use strict";
+/* ================================================================
+   Email Signature Builder — single-file app
+   ================================================================ */
 (function () {
-  "use strict";
 
-  // ---------- Default state ----------
-  const DEFAULT = {
-    template: "classic",
-    name: "Jordan Rivera",
-    title: "Senior Product Designer",
-    company: "Northwind Studio",
-    tagline: "Design & Brand",
-    phone: "+1 (555) 123-4567",
-    mobile: "",
-    email: "jordan@northwind.studio",
-    website: "www.northwind.studio",
-    address: "123 Market St, Suite 400, San Francisco, CA",
-    imageUrl: "https://i.pravatar.cc/200?img=12",
-    imageWidth: 90,
-    imageShape: "circle",
-    fontFamily: "Arial, Helvetica, sans-serif",
-    fontSize: 13,
-    nameSize: 18,
-    textColor: "#333333",
-    nameColor: "#1a1a2e",
-    accentColor: "#6c8cff",
-    mutedColor: "#777777",
-    showLabels: false,
-    showDivider: true,
-    rowSpacing: 3,
-    links: [
-      { type: "linkedin", url: "https://linkedin.com/in/jordanrivera" },
-      { type: "twitter", url: "https://twitter.com/jordanr" }
-    ]
-  };
-
-  const STORAGE_KEY = "sig-editor-state-v1";
-  let state = load();
-  let manualHtml = null; // when user edits raw HTML
-
-  function load() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return Object.assign({}, DEFAULT, JSON.parse(raw));
-    } catch (e) {}
-    return JSON.parse(JSON.stringify(DEFAULT));
+/* ---------- tiny DOM helpers ---------- */
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const el = (tag, attrs, html) => {
+  const n = document.createElement(tag);
+  if (attrs) for (const k in attrs) {
+    if (k === "class") n.className = attrs[k];
+    else if (k === "style") n.setAttribute("style", attrs[k]);
+    else if (k.startsWith("on") && typeof attrs[k] === "function") n.addEventListener(k.slice(2), attrs[k]);
+    else if (attrs[k] != null) n.setAttribute(k, attrs[k]);
   }
-  function save() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
-  }
+  if (html != null) n.innerHTML = html;
+  return n;
+};
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function uid(p){ return (p||"id") + Math.random().toString(36).slice(2,9); }
+function normUrl(u){ if(!u) return ""; if(/^(https?:|mailto:|tel:|#)/i.test(u)) return u; return "https://"+u; }
+function debounce(fn, ms){ let t; return function(){ clearTimeout(t); const a=arguments, c=this; t=setTimeout(()=>fn.apply(c,a), ms); }; }
 
-  // ---------- Helpers ----------
-  const $ = (sel, root) => (root || document).querySelector(sel);
-  const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
-  function esc(s) {
-    return String(s == null ? "" : s)
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-  function normUrl(u) {
-    if (!u) return "";
-    if (/^https?:\/\//i.test(u) || /^mailto:/i.test(u) || /^tel:/i.test(u)) return u;
-    return "https://" + u;
-  }
+/* ---------- role vocabulary (left panel fields) ---------- */
+const ROLES = [
+  { key:"photo",      label:"Photo",            type:"image" },
+  { key:"logo",       label:"Logo",             type:"image" },
+  { key:"name",       label:"Name",             type:"text"  },
+  { key:"title",      label:"Job title",        type:"text"  },
+  { key:"company",    label:"Company / Org",    type:"text"  },
+  { key:"tagline",    label:"Tagline",          type:"text"  },
+  { key:"phone",      label:"Phone",            type:"text"  },
+  { key:"mobile",     label:"Mobile",           type:"text"  },
+  { key:"email",      label:"Email",            type:"email" },
+  { key:"website",    label:"Website",          type:"url"   },
+  { key:"address",    label:"Address",          type:"text"  },
+  { key:"banner",     label:"Banner / CTA image", type:"image" },
+  { key:"disclaimer", label:"Disclaimer / legal", type:"text" }
+];
+const ROLE_BY_KEY = Object.fromEntries(ROLES.map(r=>[r.key,r]));
 
-  // Social icon badges (hosted, reliable for email)
-  const ICONS = {
-    linkedin: "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/linkedin.svg",
-    twitter:  "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/twitter.svg",
-    github:   "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons@latest/icons/github.svg",
-    instagram:"https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/instagram.svg",
-    facebook: "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/facebook.svg",
-    youtube:  "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/youtube.svg"
-  };
-  const LINK_TYPES = ["linkedin","twitter","github","instagram","facebook","youtube","custom"];
-  const LINK_LABELS = { linkedin:"LinkedIn", twitter:"Twitter/X", github:"GitHub", instagram:"Instagram", facebook:"Facebook", youtube:"YouTube", custom:"Custom" };
+const SOCIAL_TYPES = {
+  linkedin:{label:"LinkedIn", icon:"https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/linkedin.svg"},
+  twitter:{label:"Twitter/X", icon:"https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/twitter.svg"},
+  github:{label:"GitHub", icon:"https://cdn.jsdelivr.net/gh/simple-icons/simple-icons@latest/icons/github.svg"},
+  instagram:{label:"Instagram", icon:"https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/instagram.svg"},
+  facebook:{label:"Facebook", icon:"https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/facebook.svg"},
+  youtube:{label:"YouTube", icon:"https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/youtube.svg"}
+};
 
-  // ---------- HTML generation (table-based, inline styles) ----------
-  function radius(shape, w) {
-    if (shape === "circle") return Math.round(w / 2);
-    if (shape === "round") return 10;
-    return 0;
+/* ================================================================
+   STATE
+   ================================================================ */
+const DEFAULT_STYLE = {
+  fontFamily:"Arial, Helvetica, sans-serif",
+  fontSize:13, nameSize:18,
+  textColor:"#333333", nameColor:"#1a1a2e", accentColor:"#6c8cff", mutedColor:"#777777",
+  linkColor:"#6c8cff",
+  buttonRadius:6, buttonBg:"#6c8cff", buttonText:"#ffffff",
+  imageRadius:0, rowSpacing:3,
+  customTokens:[] // {id,name,kind:'color'|'font',value}
+};
+const DEFAULT_PROFILE = {
+  photo:"https://i.pravatar.cc/200?img=12",
+  logo:"",
+  name:"Jordan Rivera",
+  title:"Senior Product Designer",
+  company:"Northwind Studio",
+  tagline:"Design & Brand",
+  phone:"+1 (555) 123-4567",
+  mobile:"",
+  email:"jordan@northwind.studio",
+  website:"www.northwind.studio",
+  address:"123 Market St, San Francisco, CA",
+  banner:"",
+  disclaimer:""
+};
+const DEFAULT_SOCIALS = [
+  { id:uid("s"), type:"linkedin", url:"https://linkedin.com/in/jordanrivera" },
+  { id:uid("s"), type:"twitter",  url:"https://twitter.com/jordanr" }
+];
+
+/* App state. `html` is the live signature body markup (source of truth for layout).
+   `bindings` maps roleKey -> blockId so profile edits reflect into the markup. */
+let state = {
+  profile: deepClone(DEFAULT_PROFILE),
+  socials: deepClone(DEFAULT_SOCIALS),
+  style:   deepClone(DEFAULT_STYLE),
+  html:    "",                 // signature inner html
+  customFields: [],            // {key,label,type,value}
+  device:"desktop", bg:"light", editMode:true, rawOpen:false
+};
+
+const LS_KEY = "sig-builder-v2";
+const LS_TPL = "sig-builder-templates-v2";
+
+function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
+
+/* ---------- history (undo/redo) ---------- */
+const history = { stack:[], index:-1, max:60, lock:false };
+function snapshot(){
+  if (history.lock) return;
+  const snap = JSON.stringify({ profile:state.profile, socials:state.socials, style:state.style, html:state.html, customFields:state.customFields });
+  if (history.stack[history.index] === snap) return;
+  history.stack = history.stack.slice(0, history.index+1);
+  history.stack.push(snap);
+  if (history.stack.length > history.max) history.stack.shift();
+  history.index = history.stack.length - 1;
+  updateUndoButtons();
+}
+function restore(snap){
+  const o = JSON.parse(snap);
+  history.lock = true;
+  state.profile = o.profile; state.socials = o.socials; state.style = o.style; state.html = o.html; state.customFields = o.customFields || [];
+  history.lock = false;
+  renderAll(); persist();
+}
+function undo(){ if (history.index>0){ history.index--; restore(history.stack[history.index]); updateUndoButtons(); } }
+function redo(){ if (history.index < history.stack.length-1){ history.index++; restore(history.stack[history.index]); updateUndoButtons(); } }
+function updateUndoButtons(){ $("#btnUndo").disabled = history.index<=0; $("#btnRedo").disabled = history.index>=history.stack.length-1; }
+
+/* ---------- persistence / autosave ---------- */
+const persist = debounce(function(){
+  try { localStorage.setItem(LS_KEY, JSON.stringify({
+    profile:state.profile, socials:state.socials, style:state.style, html:state.html,
+    customFields:state.customFields, device:state.device, bg:state.bg
+  })); } catch(e){}
+}, 300);
+function loadPersisted(){
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw){ const o = JSON.parse(raw); Object.assign(state, {
+      profile:Object.assign(deepClone(DEFAULT_PROFILE), o.profile||{}),
+      socials:o.socials||deepClone(DEFAULT_SOCIALS),
+      style:Object.assign(deepClone(DEFAULT_STYLE), o.style||{}),
+      html:o.html||"", customFields:o.customFields||[],
+      device:o.device||"desktop", bg:o.bg||"light"
+    }); return true; }
+  } catch(e){}
+  return false;
+}
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(msg, bad){
+  const t = $("#toast"); t.textContent = msg; t.classList.toggle("err", !!bad);
+  t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove("show"), 2000);
+}
+
+/* ================================================================
+   STYLE HELPERS — shared inline-style strings for email safety
+   ================================================================ */
+const S = () => state.style;
+function baseTextStyle(){ const s=S(); return `font-family:${s.fontFamily};font-size:${s.fontSize}px;color:${s.textColor};line-height:1.45;`; }
+
+/* ================================================================
+   LAYOUT GENERATORS (starter templates)
+   Each returns email-safe table HTML with data-sig-role / data-sig-block.
+   ================================================================ */
+function wrapBlock(role, inner, tag){
+  tag = tag || "div";
+  return `<${tag} data-sig-block data-sig-role="${role}">${inner}</${tag}>`;
+}
+
+function imgTag(role, src, w, alt){
+  const s=S();
+  return `<img data-sig-block data-sig-role="${role}" src="${esc(src||"")}" width="${w||90}" alt="${esc(alt||"")}" style="display:block;border:0;width:${w||90}px;border-radius:${s.imageRadius}px;" />`;
+}
+function textBlock(role, html, styleOverride){
+  return `<div data-sig-block data-sig-role="${role}" style="${styleOverride||baseTextStyle()}">${html}</div>`;
+}
+
+function socialRowHtml(){
+  const s=S();
+  const links=(state.socials||[]).filter(l=>l.url);
+  let cells="";
+  links.forEach(l=>{
+    const url=normUrl(l.url); const def=SOCIAL_TYPES[l.type];
+    if(def){
+      cells+=`<td style="padding:0 8px 0 0;"><a href="${esc(url)}"><img src="${esc(def.icon)}" width="22" height="22" alt="${esc(def.label)}" style="display:block;border:0;" /></a></td>`;
+    } else {
+      cells+=`<td style="padding:0 10px 0 0;font-family:${s.fontFamily};font-size:${s.fontSize}px;"><a href="${esc(url)}" style="color:${s.linkColor};text-decoration:none;">${esc(l.label||url)}</a></td>`;
+    }
+  });
+  return `<table data-sig-block data-sig-role="social" data-sig-social="1" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;"><tr>${cells||'<td style="font-family:'+s.fontFamily+';font-size:11px;color:#aaa;">(no social links)</td>'}</tr></table>`;
+}
+
+function buttonHtml(role, label, href){
+  const s=S();
+  return `<table data-sig-block data-sig-role="${role||"button"}" data-sig-button="1" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:separate;"><tr><td style="background:${s.buttonBg};border-radius:${s.buttonRadius}px;"><a href="${esc(normUrl(href||"#"))}" style="display:inline-block;padding:9px 18px;font-family:${s.fontFamily};font-size:${s.fontSize}px;color:${s.buttonText};text-decoration:none;font-weight:600;">${esc(label||"Click here")}</a></td></tr></table>`;
+}
+function dividerHtml(){ const s=S(); return `<table data-sig-block data-sig-role="divider" cellpadding="0" cellspacing="0" border="0" width="100%" role="presentation"><tr><td style="border-top:1px solid ${s.accentColor}33;font-size:0;line-height:0;height:1px;">&nbsp;</td></tr></table>`; }
+function spacerHtml(h){ return `<table data-sig-block data-sig-role="spacer" cellpadding="0" cellspacing="0" border="0" width="100%" role="presentation"><tr><td style="font-size:0;line-height:0;height:${h||12}px;">&nbsp;</td></tr></table>`; }
+
+/* ---- info stack (name/title/contacts) used by starter layouts ---- */
+function infoStack(){
+  const s=S(); const p=state.profile; let h="";
+  h += textBlock("name", esc(p.name), `font-family:${s.fontFamily};font-size:${s.nameSize}px;font-weight:bold;color:${s.nameColor};line-height:1.2;padding-bottom:2px;`);
+  const tc=[p.title,p.company].filter(Boolean).map(esc).join(` <span style="color:${s.accentColor};">·</span> `);
+  if(tc) h += `<div data-sig-block data-sig-role="title" style="font-family:${s.fontFamily};font-size:${s.fontSize}px;color:${s.mutedColor};line-height:1.3;padding-bottom:2px;">${tc}</div>`;
+  if(p.tagline) h += textBlock("tagline", esc(p.tagline), `font-family:${s.fontFamily};font-size:${s.fontSize-1}px;color:${s.mutedColor};padding-bottom:6px;`);
+  h += spacerHtml(6);
+  const line=(role,label,val,href)=>{ if(!val) return ""; const inner= href?`<a href="${esc(href)}" style="color:${s.textColor};text-decoration:none;">${esc(val)}</a>`:esc(val); return `<div data-sig-block data-sig-role="${role}" style="${baseTextStyle()};padding:${s.rowSpacing}px 0;">${inner}</div>`; };
+  h += line("phone","Phone",p.phone, p.phone?("tel:"+String(p.phone).replace(/[^+\d]/g,"")):null);
+  h += line("mobile","Mobile",p.mobile, p.mobile?("tel:"+String(p.mobile).replace(/[^+\d]/g,"")):null);
+  h += line("email","Email",p.email, p.email?("mailto:"+p.email):null);
+  h += line("website","Website",p.website, normUrl(p.website));
+  h += line("address","Address",p.address, null);
+  h += `<div style="padding-top:10px;">${socialRowHtml()}</div>`;
+  return h;
+}
+
+const STARTERS = {
+  classic(){ const p=state.profile;
+    return `<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;"><tr>`+
+      `<td style="vertical-align:top;padding-right:18px;">${imgTag("photo",p.photo,90,p.name)}</td>`+
+      `<td style="vertical-align:top;">${infoStack()}</td></tr></table>`;
+  },
+  stacked(){ return `<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;"><tr><td style="vertical-align:top;">${infoStack()}</td></tr></table>`; },
+  divider(){ const p=state.profile; const s=S();
+    return `<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;"><tr>`+
+      `<td style="vertical-align:top;padding-right:16px;">${imgTag("photo",p.photo,80,p.name)}</td>`+
+      `<td style="vertical-align:top;padding-right:16px;width:2px;background:${s.accentColor};font-size:0;">&nbsp;</td>`+
+      `<td style="vertical-align:top;">${infoStack()}</td></tr></table>`;
+  },
+  logo(){ const p=state.profile; const s=S();
+    return `<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;">`+
+      `<tr><td style="padding-bottom:10px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation"><tr>`+
+      `<td style="width:4px;background:${s.accentColor};font-size:0;">&nbsp;</td>`+
+      `<td style="padding-left:12px;">${imgTag("logo",p.logo||p.photo,120,p.company)}</td></tr></table></td></tr>`+
+      `<tr><td>${infoStack()}</td></tr></table>`;
   }
+};
 
-  function contactLine(label, value, href) {
-    if (!value) return "";
-    const lbl = state.showLabels && label ? '<span style="color:' + state.mutedColor + ';">' + label + ' </span>' : "";
-    const inner = href
-      ? '<a href="' + esc(href) + '" style="color:' + state.textColor + '; text-decoration:none;">' + esc(value) + '</a>'
-      : esc(value);
-    return '<tr><td style="padding:' + state.rowSpacing + 'px 0; font-family:' + state.fontFamily +
-      '; font-size:' + state.fontSize + 'px; color:' + state.textColor + '; line-height:1.4;">' +
-      lbl + inner + '</td></tr>';
-  }
+/* ================================================================
+   RENDER — write state.html into the paper, decorate for editing
+   ================================================================ */
+let selectedBlock = null;
 
-  function socialRow() {
-    const links = (state.links || []).filter(l => l.url);
-    if (!links.length) return "";
-    let cells = "";
-    links.forEach(l => {
-      const url = normUrl(l.url);
-      if (l.type === "custom") {
-        cells += '<td style="padding:0 10px 0 0; font-family:' + state.fontFamily + '; font-size:' + state.fontSize +
-          'px;"><a href="' + esc(url) + '" style="color:' + state.accentColor + '; text-decoration:none;">' +
-          esc(l.label || url.replace(/^https?:\/\//, "")) + '</a></td>';
+function renderCanvas(){
+  const paper = $("#paper");
+  paper.classList.toggle("darkbg", state.bg==="dark");
+  // apply the html
+  paper.innerHTML = state.html || "";
+  // re-apply role bindings from profile into the DOM (two-way: model->view)
+  applyProfileToDom(paper);
+  applyStyleToDom(paper);
+  decorateBlocks(paper);
+  updateRawFromState();
+  updateHealth();
+  updateConnCount();
+}
+
+/* refresh the live HTML string from current paper DOM (view->model) */
+function syncHtmlFromPaper(){
+  const paper = $("#paper").cloneNode(true);
+  stripEditorChrome(paper);
+  state.html = paper.innerHTML.trim();
+}
+
+function stripEditorChrome(root){
+  $$("[data-chrome]", root).forEach(n=>n.remove());
+  $$("[data-sig-block]", root).forEach(b=>{
+    b.classList.remove("selected","connecting","highlight");
+    if(!b.getAttribute("class")) b.removeAttribute("class");
+    b.removeAttribute("contenteditable");
+  });
+}
+
+/* decorate blocks with tags, toolbars, resize handles, selection */
+function decorateBlocks(paper){
+  $$("[data-sig-block]", paper).forEach(b=>{
+    const role = b.getAttribute("data-sig-role") || "block";
+    // tag label
+    const tag = el("span", { class:"blocktag", "data-chrome":"1" }, role);
+    b.appendChild(tag);
+    // toolbar
+    const tb = el("div", { class:"block-toolbar", "data-chrome":"1" });
+    tb.appendChild(el("button",{title:"Move up",onclick:ev=>{ev.stopPropagation();moveBlock(b,-1);}},"↑"));
+    tb.appendChild(el("button",{title:"Move down",onclick:ev=>{ev.stopPropagation();moveBlock(b,1);}},"↓"));
+    tb.appendChild(el("button",{title:"Duplicate",onclick:ev=>{ev.stopPropagation();duplicateBlock(b);}},"⧉"));
+    tb.appendChild(el("button",{title:"Delete",onclick:ev=>{ev.stopPropagation();deleteBlock(b);}},"🗑"));
+    b.appendChild(tb);
+    // resize handles for images/buttons/tables
+    const resizable = b.tagName==="IMG" || b.hasAttribute("data-sig-button") || b.tagName==="TABLE";
+    if(resizable){
+      ["rz-se","rz-e","rz-s"].forEach(c=>{ const h=el("div",{class:"rz-handle "+c,"data-chrome":"1","data-dir":c.slice(3)}); b.appendChild(h); attachResize(h,b); });
+    }
+    // selection
+    b.addEventListener("click", ev=>{
+      if(connectMode.active){ ev.stopPropagation(); completeConnect(b); return; }
+      ev.stopPropagation(); selectBlock(b);
+    });
+    // text editing
+    if(isTextBlock(b)){
+      b.addEventListener("dblclick", ()=>{ b.setAttribute("contenteditable","true"); b.focus(); });
+      b.addEventListener("blur", ()=>{ b.removeAttribute("contenteditable"); commitInlineEdit(b); });
+    }
+    // draggable for reordering
+    b.setAttribute("draggable","true");
+    b.addEventListener("dragstart", ev=>onBlockDragStart(ev,b));
+    b.addEventListener("dragend", onBlockDragEnd);
+  });
+}
+
+function isTextBlock(b){
+  const r=b.getAttribute("data-sig-role");
+  return b.tagName==="DIV" && !b.hasAttribute("data-sig-button") && !["divider","spacer","social"].includes(r);
+}
+
+function selectBlock(b){
+  $$("[data-sig-block].selected", $("#paper")).forEach(n=>n.classList.remove("selected"));
+  if(b){ b.classList.add("selected"); selectedBlock=b; openInspectorFor(b); switchSideTab("elements"); }
+  else { selectedBlock=null; }
+}
+
+function commitInlineEdit(b){
+  // strip chrome nodes that may be inside after editing, then sync
+  $$("[data-chrome]", b).forEach(n=>{ /* keep—will be removed on sync */ });
+  snapshot(); syncHtmlFromPaper(); persist(); updateRawFromState(); updateHealth();
+  // try to reflect edited text back into profile if bound
+  reflectDomToProfile(b);
+}
+
+/* ================================================================
+   PROFILE <-> DOM binding
+   model->view: write profile values into the blocks that carry each role
+   view->model: when user edits text/img in canvas, update profile
+   ================================================================ */
+function applyProfileToDom(paper){
+  const p = state.profile;
+  ROLES.forEach(r=>{
+    const val = p[r.key];
+    $$(`[data-sig-role="${r.key}"]`, paper).forEach(node=>{
+      if(r.type==="image"){
+        const img = node.tagName==="IMG" ? node : node.querySelector("img");
+        if(img && val!=null && val!=="") img.setAttribute("src", val);
+      } else if(r.key==="title"){
+        // composite title · company — rebuild if both are simple
+        setRoleText(node, [p.title,p.company].filter(Boolean).join(" · "), val);
       } else {
-        const icon = ICONS[l.type] || ICONS.linkedin;
-        cells += '<td style="padding:0 8px 0 0;"><a href="' + esc(url) + '"><img src="' + esc(icon) +
-          '" width="22" height="22" alt="' + esc(LINK_LABELS[l.type] || l.type) +
-          '" style="display:block; border:0;" /></a></td>';
+        setRoleText(node, val, val);
       }
     });
-    return '<tr><td style="padding-top:10px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation"><tr>' +
-      cells + '</tr></table></td></tr>';
+  });
+  // custom fields
+  (state.customFields||[]).forEach(f=>{
+    $$(`[data-sig-role="${f.key}"]`, paper).forEach(node=>{ if(f.type!=="image" && f.value!=null) setRoleText(node, f.value, f.value); });
+  });
+}
+/* write text into a role block while preserving a single inner <a> if present
+   (so contact links keep their href but update the visible label) */
+function setRoleText(node, value, raw){
+  if(value==null) return;
+  const chrome = $$("[data-chrome]", node);
+  const a = node.querySelector && node.querySelector("a");
+  if(a && node.querySelectorAll("a").length===1 && !a.querySelector("img")){
+    a.textContent = value;
+  } else if(!node.querySelector || node.children.length===0 || (node.children.length===chrome.length)){
+    // pure text node (only chrome children) — set text then re-append chrome
+    node.textContent = value;
+    chrome.forEach(c=>node.appendChild(c));
   }
+}
 
-  function infoBlock() {
-    let html = "";
-    // Name
-    html += '<tr><td style="padding:0 0 2px; font-family:' + state.fontFamily + '; font-size:' + state.nameSize +
-      'px; font-weight:bold; color:' + state.nameColor + '; line-height:1.2;">' + esc(state.name) + '</td></tr>';
-    // Title + company
-    const tc = [state.title, state.company].filter(Boolean)
-      .map(esc).join(' <span style="color:' + state.accentColor + ';">·</span> ');
-    if (tc) {
-      html += '<tr><td style="padding:0 0 2px; font-family:' + state.fontFamily + '; font-size:' + state.fontSize +
-        'px; color:' + state.mutedColor + '; line-height:1.3;">' + tc + '</td></tr>';
-    }
-    if (state.tagline) {
-      html += '<tr><td style="padding:0 0 6px; font-family:' + state.fontFamily + '; font-size:' + (state.fontSize - 1) +
-        'px; color:' + state.mutedColor + '; line-height:1.3;">' + esc(state.tagline) + '</td></tr>';
-    }
-    // spacer
-    html += '<tr><td style="font-size:0; line-height:0; height:6px;">&nbsp;</td></tr>';
-    // contacts
-    html += contactLine("P:", state.phone, "tel:" + String(state.phone).replace(/[^+\d]/g, ""));
-    html += contactLine("M:", state.mobile, "tel:" + String(state.mobile).replace(/[^+\d]/g, ""));
-    html += contactLine("E:", state.email, "mailto:" + state.email);
-    html += contactLine("W:", state.website, normUrl(state.website));
-    html += contactLine("", state.address, null);
-    html += socialRow();
-    return html;
+function reflectDomToProfile(b){
+  const role=b.getAttribute("data-sig-role"); if(!role) return;
+  const r=ROLE_BY_KEY[role];
+  if(r && r.type!=="image" && role!=="title"){
+    const txt=(b.textContent||"").trim();
+    if(txt && state.profile[role]!==undefined){ state.profile[role]=txt; renderFields(); }
   }
+  const cf=(state.customFields||[]).find(f=>f.key===role);
+  if(cf && cf.type!=="image"){ cf.value=(b.textContent||"").trim(); renderFields(); }
+}
 
-  function imageCell(extraStyle) {
-    if (!state.imageUrl) return "";
-    const w = state.imageWidth;
-    const r = radius(state.imageShape, w);
-    return '<td style="vertical-align:top; padding-right:18px; ' + (extraStyle || "") + '">' +
-      '<img src="' + esc(state.imageUrl) + '" width="' + w + '" alt="' + esc(state.name) +
-      '" style="display:block; border:0; width:' + w + 'px; border-radius:' + r + 'px;" /></td>';
-  }
+/* ================================================================
+   STYLE -> DOM (global restyle of recognized blocks)
+   ================================================================ */
+function applyStyleToDom(paper){
+  const s=S();
+  // buttons
+  $$('[data-sig-button]', paper).forEach(tbl=>{
+    const td=tbl.querySelector("td"); const a=tbl.querySelector("a");
+    if(td){ td.style.background=s.buttonBg; td.style.borderRadius=s.buttonRadius+"px"; }
+    if(a){ a.style.color=s.buttonText; a.style.fontFamily=s.fontFamily; a.style.fontSize=s.fontSize+"px"; }
+  });
+  // images radius (only role photo/logo/banner)
+  $$('img[data-sig-role]', paper).forEach(img=>{
+    const role=img.getAttribute("data-sig-role");
+    if(["photo","logo","banner"].includes(role)) img.style.borderRadius=s.imageRadius+"px";
+  });
+}
 
-  function dividerRow() {
-    if (!state.showDivider) return "";
-    return '<tr><td colspan="3" style="padding-bottom:12px;"><table cellpadding="0" cellspacing="0" border="0" width="100%" role="presentation"><tr>' +
-      '<td style="border-top:1px solid ' + state.accentColor + '33; font-size:0; line-height:0;">&nbsp;</td></tr></table></td></tr>';
-  }
+/* ================================================================
+   BLOCK OPERATIONS
+   ================================================================ */
+function moveBlock(b, dir){
+  const parent=b.parentNode;
+  if(dir<0 && b.previousElementSibling) parent.insertBefore(b, b.previousElementSibling);
+  else if(dir>0 && b.nextElementSibling) parent.insertBefore(b.nextElementSibling, b);
+  afterStructureChange();
+}
+function duplicateBlock(b){
+  const clone=b.cloneNode(true);
+  $$("[data-chrome]", clone).forEach(n=>n.remove());
+  clone.classList.remove("selected");
+  b.parentNode.insertBefore(clone, b.nextElementSibling);
+  afterStructureChange();
+}
+function deleteBlock(b){ const p=b.parentNode; b.remove(); selectedBlock=null; openInspectorFor(null); afterStructureChange(); }
 
-  function generate() {
-    const t = state.template;
-    let inner = "";
+function afterStructureChange(){ snapshot(); syncHtmlFromPaper(); renderCanvas(); persist(); }
 
-    if (t === "classic") {
-      inner =
-        '<tr>' + imageCell() +
-        '<td style="vertical-align:top;"><table cellpadding="0" cellspacing="0" border="0" role="presentation">' +
-        infoBlock() + '</table></td></tr>';
-    } else if (t === "stacked") {
-      inner = '<tr><td style="vertical-align:top;"><table cellpadding="0" cellspacing="0" border="0" role="presentation">' +
-        infoBlock() + '</table></td></tr>';
-    } else if (t === "divider") {
-      inner = '<tr>' + imageCell() +
-        '<td style="vertical-align:top; padding-right:18px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation">' +
-        '<tr><td style="width:2px; background:' + state.accentColor + '; font-size:0; line-height:0;" height="100%">&nbsp;</td></tr>' +
-        '</table></td>' +
-        '<td style="vertical-align:top;"><table cellpadding="0" cellspacing="0" border="0" role="presentation">' +
-        infoBlock() + '</table></td></tr>';
-    } else if (t === "logo") {
-      inner =
-        '<tr><td colspan="2" style="padding-bottom:10px;">' +
-        '<table cellpadding="0" cellspacing="0" border="0" width="100%" role="presentation"><tr>' +
-        '<td style="width:4px; background:' + state.accentColor + '; font-size:0;">&nbsp;</td>' +
-        '<td style="padding-left:12px; vertical-align:middle;">' +
-        (state.imageUrl ? '<img src="' + esc(state.imageUrl) + '" width="' + state.imageWidth +
-          '" alt="' + esc(state.company) + '" style="display:block; border:0; border-radius:' +
-          radius(state.imageShape, state.imageWidth) + 'px;" />' : "") +
-        '</td></tr></table></td></tr>' +
-        '<tr><td colspan="2"><table cellpadding="0" cellspacing="0" border="0" role="presentation">' +
-        infoBlock() + '</table></td></tr>';
-    }
+/* ================================================================
+   INIT & top-level render
+   ================================================================ */
+function renderAll(){
+  renderFields();
+  renderSocials();
+  renderStyleMenu();
+  renderStarters();
+  renderTemplatesList();
+  // if no html yet, generate from default starter
+  if(!state.html) state.html = STARTERS.classic();
+  renderCanvas();
+  applyDeviceBg();
+}
 
-    const html =
-      '<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;">' +
-      dividerRow() + inner + '</table>';
+function applyDeviceBg(){
+  const shell=$("#canvasShell");
+  shell.classList.toggle("desktop", state.device==="desktop");
+  shell.classList.toggle("mobile", state.device==="mobile");
+  shell.classList.toggle("editing", state.editMode);
+  $("#paper").classList.toggle("darkbg", state.bg==="dark");
+  $$(".pill[data-device]").forEach(p=>p.classList.toggle("active", p.getAttribute("data-device")===state.device));
+  $("#bgPill").classList.toggle("active", state.bg==="dark");
+  $("#bgPill").textContent = state.bg==="dark" ? "◼ Dark" : "◻ Light";
+  $("#editPill").classList.toggle("active", state.editMode);
+}
 
-    return html;
-  }
+/* -------- placeholders filled by later sections (defined below) -------- */
+/* renderFields, renderSocials, renderStyleMenu, renderStarters,
+   renderTemplatesList, openInspectorFor, switchSideTab, connectMode,
+   completeConnect, attachResize, onBlockDragStart/End, updateRaw*,
+   updateHealth, updateConnCount, import/export — all defined next. */
 
-  function currentHtml() {
-    return manualHtml != null ? manualHtml : generate();
-  }
+/* ================================================================
+   EXPORT handle to window so remaining sections attach cleanly
+   (kept in one closure; functions declared with `function` are hoisted) */
+window.__SIGAPP = { state };
 
-  // ---------- Render ----------
-  function render() {
-    const html = currentHtml();
-    $("#previewContent").innerHTML = html;
-    if (manualHtml == null) $("#codeArea").value = formatHtml(html);
-    renderImgPreview();
-  }
+/* ================================================================
+   SIDEBAR: profile fields (with drag-to-connect targets)
+   ================================================================ */
+function allFieldDefs(){
+  return ROLES.concat((state.customFields||[]).map(f=>({key:f.key,label:f.label,type:f.type,custom:true})));
+}
+function roleBoundBlock(key){ return $(`#paper [data-sig-role="${key}"]`); }
 
-  function formatHtml(html) {
-    // light pretty-print for readability
-    return html
-      .replace(/></g, ">\n<")
-      .replace(/(<table[^>]*>)/g, "\n$1")
-      .trim();
-  }
+function renderFields(){
+  const host=$("#fieldsHost"); host.innerHTML="";
+  allFieldDefs().forEach(def=>{
+    const bound = !!roleBoundBlock(def.key);
+    const val = def.custom ? (state.customFields.find(f=>f.key===def.key)||{}).value : state.profile[def.key];
+    const wrap=el("div",{ class:"cfield"+(bound?" connected":""), "data-role":def.key });
+    const head=el("div",{class:"chead"});
+    head.appendChild(el("span",{class:"status"}));
+    head.appendChild(el("span",{class:"clabel"}, esc(def.label)));
+    head.appendChild(el("span",{class:"ctype"}, def.type));
+    const bindTag=el("span",{class:"cbind"+(bound?"":" unbound")}, bound?"● linked":"○ not linked");
+    head.appendChild(bindTag);
+    if(bound){ const un=el("button",{class:"unlink",title:"Disconnect"},"⦸"); un.addEventListener("click",()=>unlinkRole(def.key)); head.appendChild(un); }
+    if(def.custom){ const del=el("button",{class:"unlink",title:"Remove field"},"×"); del.addEventListener("click",()=>{ state.customFields=state.customFields.filter(f=>f.key!==def.key); renderFields(); }); head.appendChild(del); }
+    wrap.appendChild(head);
 
-  function renderImgPreview() {
-    const box = $("#imgPreview");
-    box.innerHTML = state.imageUrl
-      ? '<img src="' + esc(state.imageUrl) + '" alt="preview" />'
-      : '<span class="hint">No image set.</span>';
-  }
-
-  // ---------- Bind form -> state ----------
-  function syncFormFromState() {
-    $$("[data-field]").forEach(el => {
-      const key = el.getAttribute("data-field");
-      if (!(key in state)) return;
-      if (el.type === "checkbox") el.checked = !!state[key];
-      else el.value = state[key];
+    let input;
+    if(def.type==="image"){
+      input=el("input",{type:"url",placeholder:"Image URL", value:esc(val||"")});
+    } else if(def.type==="email"){ input=el("input",{type:"email", value:esc(val||"")}); }
+    else if(def.type==="url"){ input=el("input",{type:"url", value:esc(val||"")}); }
+    else { input=el("input",{type:"text", value:esc(val||"")}); }
+    input.addEventListener("input",()=>{
+      if(def.custom){ const f=state.customFields.find(x=>x.key===def.key); if(f) f.value=input.value; }
+      else state.profile[def.key]=input.value;
+      snapshot(); renderCanvas(); persist();
     });
-    $$("[data-color]").forEach(el => { el.value = state[el.getAttribute("data-color")]; });
-    renderLinks();
-  }
+    wrap.appendChild(input);
 
-  function onFieldInput(e) {
-    const el = e.target;
-    const key = el.getAttribute("data-field");
-    if (!key) return;
-    if (el.type === "checkbox") state[key] = el.checked;
-    else if (el.type === "number") state[key] = Number(el.value);
-    else state[key] = el.value;
-    // keep paired color text/input in sync
-    if (el.hasAttribute("data-field")) {
-      const colorInput = $('[data-color="' + key + '"]');
-      if (colorInput && /^#?[0-9a-fA-F]{3,6}$/.test(el.value)) colorInput.value = el.value.startsWith("#") ? el.value : "#" + el.value;
+    // hover highlight both ways
+    wrap.addEventListener("mouseenter",()=>highlightRole(def.key,true));
+    wrap.addEventListener("mouseleave",()=>highlightRole(def.key,false));
+
+    // drag-to-connect: this field is a drop target for canvas blocks
+    wrap.addEventListener("dragover",ev=>{ if(dragKind==="block"){ ev.preventDefault(); wrap.classList.add("droptarget"); } });
+    wrap.addEventListener("dragleave",()=>wrap.classList.remove("droptarget"));
+    wrap.addEventListener("drop",ev=>{ ev.preventDefault(); wrap.classList.remove("droptarget"); if(draggedBlock){ connectRoleToBlock(def.key, draggedBlock); } });
+
+    host.appendChild(wrap);
+  });
+  updateConnCount();
+}
+
+function highlightRole(key, on){
+  const b=roleBoundBlock(key); if(b) b.classList.toggle("highlight", on);
+  const f=$(`#fieldsHost .cfield[data-role="${key}"]`); if(f) f.classList.toggle("highlight", on);
+}
+
+function connectRoleToBlock(key, block){
+  // remove role from any previous holder of this key, set on new block
+  $$(`#paper [data-sig-role="${key}"]`).forEach(n=>{ if(n!==block) n.removeAttribute("data-sig-role"); });
+  block.setAttribute("data-sig-role", key);
+  // pull existing value into profile if empty, else push profile into block
+  const def = ROLE_BY_KEY[key] || (state.customFields.find(f=>f.key===key));
+  if(def){
+    if(def.type==="image" && block.tagName==="IMG"){
+      const cur = key in state.profile ? state.profile[key] : (state.customFields.find(f=>f.key===key)||{}).value;
+      if(cur) block.setAttribute("src",cur); else { if(key in state.profile) state.profile[key]=block.getAttribute("src")||""; }
+    } else if(def.type!=="image"){
+      const cur = key in state.profile ? state.profile[key] : (state.customFields.find(f=>f.key===key)||{}).value;
+      if(!cur){ const t=(block.textContent||"").trim(); if(key in state.profile) state.profile[key]=t; }
     }
-    manualHtml = null; // form edits override manual html
-    save(); render();
   }
+  afterStructureChange(); renderFields();
+  toast("Linked “"+(def?def.label:key)+"” to element");
+}
+function unlinkRole(key){ $$(`#paper [data-sig-role="${key}"]`).forEach(n=>n.removeAttribute("data-sig-role")); afterStructureChange(); renderFields(); }
 
-  function onColorInput(e) {
-    const key = e.target.getAttribute("data-color");
-    state[key] = e.target.value;
-    const txt = $('[data-field="' + key + '"]');
-    if (txt) txt.value = e.target.value;
-    manualHtml = null; save(); render();
-  }
+function updateConnCount(){
+  const defs=allFieldDefs(); const total=defs.length;
+  const linked=defs.filter(d=>roleBoundBlock(d.key)).length;
+  const b=$("#connCount"); if(b) b.textContent=linked+"/"+total;
+}
 
-  // ---------- Links UI ----------
-  function renderLinks() {
-    const list = $("#linksList");
-    list.innerHTML = "";
-    (state.links || []).forEach((link, i) => {
-      const row = document.createElement("div");
-      row.className = "link-item";
-      const sel = document.createElement("select");
-      LINK_TYPES.forEach(tp => {
-        const o = document.createElement("option");
-        o.value = tp; o.textContent = LINK_LABELS[tp];
-        if (tp === link.type) o.selected = true;
-        sel.appendChild(o);
-      });
-      sel.addEventListener("change", () => { link.type = sel.value; save(); render(); });
+/* custom field creator */
+function addCustomField(){
+  const name=prompt("Field name (e.g. Pronouns, Booking link):"); if(!name) return;
+  const key="cf_"+name.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"")+"_"+Math.random().toString(36).slice(2,5);
+  const type=prompt("Type: text or image","text")==="image"?"image":"text";
+  state.customFields.push({key,label:name,type,value:""});
+  renderFields(); switchSideTab("content");
+}
 
-      const url = document.createElement("input");
-      url.type = "text";
-      url.placeholder = link.type === "custom" ? "https://… (label:url optional)" : "Profile URL";
-      url.value = link.url || "";
-      url.addEventListener("input", () => { link.url = url.value; save(); render(); });
-
-      const rm = document.createElement("button");
-      rm.className = "remove"; rm.textContent = "×"; rm.title = "Remove";
-      rm.addEventListener("click", () => { state.links.splice(i, 1); save(); renderLinks(); render(); });
-
-      row.appendChild(sel); row.appendChild(url); row.appendChild(rm);
-      list.appendChild(row);
+/* ================================================================
+   SIDEBAR: socials
+   ================================================================ */
+function renderSocials(){
+  const host=$("#socialHost"); host.innerHTML="";
+  (state.socials||[]).forEach((l)=>{
+    const row=el("div",{class:"row2", style:"margin-bottom:7px;align-items:center;"});
+    const sel=el("select",{style:"flex:0 0 108px;"});
+    Object.keys(SOCIAL_TYPES).concat(["custom"]).forEach(t=>{
+      const o=el("option",{value:t}, t==="custom"?"Custom":SOCIAL_TYPES[t].label);
+      if(t===l.type) o.setAttribute("selected","");
+      sel.appendChild(o);
     });
-  }
+    sel.value=l.type;
+    sel.addEventListener("change",()=>{ l.type=sel.value; snapshot(); renderCanvas(); persist(); });
+    const url=el("input",{type:"text", placeholder:"URL", value:esc(l.url||"")});
+    url.addEventListener("input",()=>{ l.url=url.value; snapshot(); renderCanvas(); persist(); });
+    const rm=el("button",{class:"btn ghost small", style:"flex:0 0 auto;"},"×");
+    rm.addEventListener("click",()=>{ state.socials=state.socials.filter(x=>x.id!==l.id); snapshot(); renderSocials(); renderCanvas(); persist(); });
+    row.appendChild(sel); row.appendChild(url); row.appendChild(rm);
+    host.appendChild(row);
+  });
+}
 
-  // ---------- Copy / export ----------
-  function showToast(msg, bad) {
-    const t = $("#toast");
-    t.textContent = msg;
-    t.style.background = bad ? "var(--danger)" : "var(--good)";
-    t.style.color = bad ? "#fff" : "#04281b";
-    t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), 1800);
-  }
+/* ================================================================
+   SIDEBAR: style menu + eyedropper + custom tokens
+   ================================================================ */
+function colorControl(label, key){
+  const wrap=el("div",{class:"field"});
+  wrap.appendChild(el("label",null,esc(label)));
+  const row=el("div",{class:"color-row"});
+  const sw=el("input",{type:"color", class:"swatch", value:toHex(S()[key])});
+  const tx=el("input",{type:"text", value:S()[key]});
+  const eye=el("button",{class:"eyedrop", title:"Pick color from screen"},"⟡");
+  sw.addEventListener("input",()=>{ setStyle(key, sw.value); tx.value=sw.value; });
+  tx.addEventListener("input",()=>{ setStyle(key, tx.value); if(/^#[0-9a-f]{3,6}$/i.test(tx.value)) sw.value=toHex(tx.value); });
+  eye.addEventListener("click",async()=>{
+    if(window.EyeDropper){ try{ const r=await new EyeDropper().open(); setStyle(key,r.sRGBHex); sw.value=toHex(r.sRGBHex); tx.value=r.sRGBHex; toast("Picked "+r.sRGBHex); }catch(e){} }
+    else toast("EyeDropper not supported in this browser", true);
+  });
+  row.appendChild(sw); row.appendChild(tx); row.appendChild(eye);
+  wrap.appendChild(row);
+  return wrap;
+}
+function toHex(c){ if(!c) return "#000000"; if(/^#[0-9a-f]{6}$/i.test(c)) return c; if(/^#[0-9a-f]{3}$/i.test(c)) return "#"+c.slice(1).split("").map(x=>x+x).join(""); return c; }
+function setStyle(key,val){ state.style[key]=val; snapshot(); renderCanvas(); persist(); }
 
-  async function copyRich() {
-    const html = currentHtml();
-    try {
-      if (navigator.clipboard && window.ClipboardItem) {
-        const item = new ClipboardItem({
-          "text/html": new Blob([html], { type: "text/html" }),
-          "text/plain": new Blob([plainText()], { type: "text/plain" })
-        });
-        await navigator.clipboard.write([item]);
-        showToast("Signature copied — paste into your email client");
-        return;
+function sliderControl(label,key,min,max,unit){
+  const wrap=el("div",{class:"field"});
+  wrap.appendChild(el("label",null,esc(label)));
+  const row=el("div",{class:"slider-row"});
+  const r=el("input",{type:"range",min,max,value:S()[key]});
+  const v=el("span",{class:"val"}, S()[key]+(unit||""));
+  r.addEventListener("input",()=>{ setStyle(key,Number(r.value)); v.textContent=r.value+(unit||""); });
+  row.appendChild(r); row.appendChild(v); wrap.appendChild(row); return wrap;
+}
+
+function renderStyleMenu(){
+  const host=$("#styleHost"); host.innerHTML="";
+
+  const typo=el("div",{class:"section"}); typo.appendChild(el("h3",null,"Typography"));
+  const ff=el("select");
+  const fonts=["Arial, Helvetica, sans-serif","Helvetica, Arial, sans-serif","Georgia, 'Times New Roman', serif","'Trebuchet MS', Verdana, sans-serif","Verdana, Geneva, sans-serif","Tahoma, Verdana, sans-serif","'Courier New', Courier, monospace"];
+  (state.style.customTokens||[]).filter(t=>t.kind==="font").forEach(t=>fonts.push(t.value));
+  fonts.forEach(f=>{ const o=el("option",{value:f}, f.split(",")[0].replace(/'/g,"")); if(f===state.style.fontFamily)o.setAttribute("selected",""); ff.appendChild(o); });
+  ff.value=state.style.fontFamily;
+  ff.addEventListener("change",()=>setStyle("fontFamily",ff.value));
+  const ffField=el("div",{class:"field"}); ffField.appendChild(el("label",null,"Font family")); ffField.appendChild(ff); typo.appendChild(ffField);
+  typo.appendChild(sliderControl("Base text size","fontSize",10,20,"px"));
+  typo.appendChild(sliderControl("Name size","nameSize",12,32,"px"));
+  host.appendChild(typo);
+
+  const col=el("div",{class:"section"}); col.appendChild(el("h3",null,"Colors"));
+  col.appendChild(colorControl("Text","textColor"));
+  col.appendChild(colorControl("Name","nameColor"));
+  col.appendChild(colorControl("Accent","accentColor"));
+  col.appendChild(colorControl("Muted","mutedColor"));
+  col.appendChild(colorControl("Links","linkColor"));
+  host.appendChild(col);
+
+  const btn=el("div",{class:"section"}); btn.appendChild(el("h3",null,"Buttons (global)"));
+  btn.appendChild(sliderControl("Corner radius","buttonRadius",0,28,"px"));
+  btn.appendChild(colorControl("Button background","buttonBg"));
+  btn.appendChild(colorControl("Button text","buttonText"));
+  host.appendChild(btn);
+
+  const img=el("div",{class:"section"}); img.appendChild(el("h3",null,"Images & spacing"));
+  img.appendChild(sliderControl("Image corner radius","imageRadius",0,120,"px"));
+  img.appendChild(sliderControl("Row spacing","rowSpacing",0,14,"px"));
+  host.appendChild(img);
+
+  // custom tokens
+  const ct=el("div",{class:"section"}); ct.appendChild(el("h3",null,"Custom tokens"));
+  const tokHost=el("div"); 
+  (state.style.customTokens||[]).forEach(t=>{
+    const row=el("div",{class:"row2",style:"margin-bottom:7px;align-items:center;"});
+    row.appendChild(el("span",{style:"flex:1;font-size:12px;"}, esc(t.name)+" ("+t.kind+")"));
+    if(t.kind==="color"){ const sw=el("span",{class:"swatch",style:"background:"+t.value+";cursor:default;"}); row.appendChild(sw); }
+    const copy=el("button",{class:"btn ghost small",style:"flex:0 0 auto;"},"copy");
+    copy.addEventListener("click",()=>{ navigator.clipboard && navigator.clipboard.writeText(t.value); toast("Copied "+t.value); });
+    const rm=el("button",{class:"btn ghost small",style:"flex:0 0 auto;"},"×");
+    rm.addEventListener("click",()=>{ state.style.customTokens=state.style.customTokens.filter(x=>x.id!==t.id); renderStyleMenu(); persist(); });
+    row.appendChild(copy); row.appendChild(rm); tokHost.appendChild(row);
+  });
+  ct.appendChild(tokHost);
+  const add=el("button",{class:"btn ghost small",style:"margin-top:6px;"},"+ Add custom color / font");
+  add.addEventListener("click",addCustomToken);
+  ct.appendChild(add);
+  ct.appendChild(el("p",{class:"hint"},"Extra colors/fonts on top of the standard set. Fonts appear in the family dropdown."));
+  host.appendChild(ct);
+}
+function addCustomToken(){
+  const kind=prompt("Token kind: color or font","color")==="font"?"font":"color";
+  const name=prompt(kind==="color"?"Color name (e.g. Brand red):":"Font label:"); if(!name) return;
+  const value=prompt(kind==="color"?"Hex value (e.g. #ff3366):":"CSS font stack (e.g. 'Inter', Arial, sans-serif):"); if(!value) return;
+  state.style.customTokens=state.style.customTokens||[];
+  state.style.customTokens.push({id:uid("tok"),name,kind,value});
+  renderStyleMenu(); persist(); toast("Added custom "+kind);
+}
+
+/* ================================================================
+   SIDEBAR: starter layouts + saved templates
+   ================================================================ */
+function renderStarters(){
+  const host=$("#starterHost"); host.innerHTML="";
+  [["classic","Classic"],["stacked","Stacked"],["divider","Divider"],["logo","Logo bar"]].forEach(([k,lbl])=>{
+    const it=el("div",{class:"pal-item"}, `<span class="ic">▤</span>${lbl}`);
+    it.addEventListener("click",()=>{ applyStarter(k); });
+    host.appendChild(it);
+  });
+}
+function applyStarter(k){
+  if(!STARTERS[k]) return;
+  snapshot(); state.html=STARTERS[k](); renderCanvas(); persist(); toast("Applied layout: "+k);
+}
+
+function getTemplates(){ try{ return JSON.parse(localStorage.getItem(LS_TPL)||"[]"); }catch(e){ return []; } }
+function setTemplates(a){ try{ localStorage.setItem(LS_TPL, JSON.stringify(a)); }catch(e){} }
+function renderTemplatesList(){
+  const host=$("#tplList"); host.innerHTML="";
+  const tpls=getTemplates();
+  if(!tpls.length){ host.appendChild(el("p",{class:"hint"},"No saved templates yet.")); return; }
+  tpls.forEach(t=>{
+    const row=el("div",{class:"tpl-item"});
+    const nm=el("span",{class:"nm"}, esc(t.name)); nm.addEventListener("click",()=>loadTemplate(t.id));
+    const dup=el("button",{class:"mini",title:"Overwrite with current"},"⟲"); dup.addEventListener("click",()=>{ t.html=state.html; t.style=deepClone(state.style); setTemplates(tpls); toast("Updated “"+t.name+"”"); });
+    const del=el("button",{class:"mini",title:"Delete"},"×"); del.addEventListener("click",()=>{ setTemplates(getTemplates().filter(x=>x.id!==t.id)); renderTemplatesList(); });
+    row.appendChild(nm); row.appendChild(dup); row.appendChild(del); host.appendChild(row);
+  });
+}
+function saveTemplate(){
+  const name=($("#tplName").value||"").trim()||("Template "+(getTemplates().length+1));
+  const tpls=getTemplates();
+  tpls.push({ id:uid("tpl"), name, html:state.html, style:deepClone(state.style) });
+  setTemplates(tpls); $("#tplName").value=""; renderTemplatesList(); toast("Saved template “"+name+"”");
+}
+function loadTemplate(id){
+  const t=getTemplates().find(x=>x.id===id); if(!t) return;
+  snapshot(); state.html=t.html; if(t.style) state.style=Object.assign(deepClone(DEFAULT_STYLE),t.style);
+  renderCanvas(); renderStyleMenu(); persist(); toast("Loaded “"+t.name+"” (profile kept)");
+}
+
+/* ================================================================
+   INSPECTOR (selected element editor)
+   ================================================================ */
+function switchSideTab(tab){
+  $$(".side-tab").forEach(t=>t.classList.toggle("active", t.getAttribute("data-tab")===tab));
+  $$(".side-pane").forEach(p=>p.classList.toggle("active", p.getAttribute("data-pane")===tab));
+}
+function openInspectorFor(b){
+  const host=$("#inspectorHost"); host.innerHTML="";
+  if(!b){ host.appendChild(el("p",{class:"hint"},"Select an element on the canvas to edit it here.")); return; }
+  const role=b.getAttribute("data-sig-role")||"block";
+  host.appendChild(el("div",{style:"font-size:12px;color:var(--muted);margin-bottom:8px;"}, "Type: <b style='color:var(--text)'>"+esc(role)+"</b>"));
+
+  // role assignment dropdown
+  const rf=el("div",{class:"field"}); rf.appendChild(el("label",null,"Connect to field"));
+  const sel=el("select");
+  sel.appendChild(el("option",{value:""},"— none —"));
+  allFieldDefs().forEach(d=>{ const o=el("option",{value:d.key}, d.label); if(d.key===role)o.setAttribute("selected",""); sel.appendChild(o); });
+  sel.value = (ROLE_BY_KEY[role]||state.customFields.find(f=>f.key===role))?role:"";
+  sel.addEventListener("change",()=>{ if(sel.value) connectRoleToBlock(sel.value,b); else unlinkRole(role); });
+  rf.appendChild(sel); host.appendChild(rf);
+
+  if(b.tagName==="IMG"){
+    const f1=el("div",{class:"field"}); f1.appendChild(el("label",null,"Image URL"));
+    const i1=el("input",{type:"url",value:esc(b.getAttribute("src")||"")});
+    i1.addEventListener("input",()=>{ b.setAttribute("src",i1.value); scheduleSyncInspector(); });
+    f1.appendChild(i1); host.appendChild(f1);
+    const f2=el("div",{class:"field"}); f2.appendChild(el("label",null,"Width (px)"));
+    const i2=el("input",{type:"number",value:parseInt(b.getAttribute("width")||b.offsetWidth)||90});
+    i2.addEventListener("input",()=>{ b.setAttribute("width",i2.value); b.style.width=i2.value+"px"; scheduleSyncInspector(); });
+    f2.appendChild(i2); host.appendChild(f2);
+  }
+  if(b.hasAttribute("data-sig-button")){
+    const a=b.querySelector("a");
+    const f1=el("div",{class:"field"}); f1.appendChild(el("label",null,"Label"));
+    const i1=el("input",{type:"text",value:esc(a?a.textContent:"")});
+    i1.addEventListener("input",()=>{ if(a)a.textContent=i1.value; scheduleSyncInspector(); });
+    f1.appendChild(i1); host.appendChild(f1);
+    const f2=el("div",{class:"field"}); f2.appendChild(el("label",null,"Link URL"));
+    const i2=el("input",{type:"url",value:esc(a?a.getAttribute("href"):"")});
+    i2.addEventListener("input",()=>{ if(a)a.setAttribute("href",normUrl(i2.value)); scheduleSyncInspector(); });
+    f2.appendChild(i2); host.appendChild(f2);
+  }
+  if(isTextBlock(b)){
+    const f1=el("div",{class:"field"}); f1.appendChild(el("label",null,"Text"));
+    const ta=el("textarea",{style:"min-height:70px;"}); ta.value=b.textContent;
+    ta.addEventListener("input",()=>{ b.textContent=ta.value; reflectDomToProfile(b); scheduleSyncInspector(); });
+    f1.appendChild(ta); host.appendChild(f1);
+  }
+  if(b.getAttribute("data-sig-role")==="spacer"){
+    const td=b.querySelector("td"); const cur=parseInt((td&&td.style.height)||12);
+    host.appendChild(sliderInline("Height","spacerH",0,60,cur,"px",v=>{ if(td){ td.style.height=v+"px"; } scheduleSyncInspector(); }));
+  }
+  const del=el("button",{class:"btn ghost small",style:"margin-top:8px;"},"🗑 Delete element");
+  del.addEventListener("click",()=>deleteBlock(b));
+  host.appendChild(del);
+}
+function sliderInline(label,id,min,max,val,unit,cb){
+  const wrap=el("div",{class:"field"}); wrap.appendChild(el("label",null,label));
+  const row=el("div",{class:"slider-row"}); const r=el("input",{type:"range",min,max,value:val}); const v=el("span",{class:"val"},val+unit);
+  r.addEventListener("input",()=>{ v.textContent=r.value+unit; cb(Number(r.value)); });
+  row.appendChild(r); row.appendChild(v); wrap.appendChild(row); return wrap;
+}
+const scheduleSyncInspector=debounce(()=>{ snapshot(); syncHtmlFromPaper(); applyProfileToDom($("#paper")); updateRawFromState(); updateHealth(); persist(); },250);
+
+/* ================================================================
+   DRAG & DROP — palette add + block reorder + resize
+   ================================================================ */
+let dragKind=null, draggedBlock=null, dropLine=null;
+
+function newBlockHtml(kind){
+  const s=S();
+  switch(kind){
+    case "text": return textBlock("block","New text goes here.");
+    case "heading": return textBlock("block","Heading", `font-family:${s.fontFamily};font-size:${s.nameSize}px;font-weight:bold;color:${s.nameColor};`);
+    case "image": return imgTag("block","https://via.placeholder.com/120x120.png?text=Image",120,"image");
+    case "button": return buttonHtml("button","Click here","#");
+    case "social": return socialRowHtml();
+    case "divider": return dividerHtml();
+    case "spacer": return spacerHtml(16);
+    case "table": return `<table data-sig-block data-sig-role="table" cellpadding="6" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;${baseTextStyle()}"><tr><td style="border:1px solid #ddd;">Cell</td><td style="border:1px solid #ddd;">Cell</td></tr><tr><td style="border:1px solid #ddd;">Cell</td><td style="border:1px solid #ddd;">Cell</td></tr></table>`;
+    case "columns": return `<table data-sig-block data-sig-role="columns" cellpadding="0" cellspacing="0" border="0" width="100%" role="presentation" style="border-collapse:collapse;"><tr><td style="vertical-align:top;padding-right:10px;width:50%;${baseTextStyle()}">Left column</td><td style="vertical-align:top;padding-left:10px;width:50%;${baseTextStyle()}">Right column</td></tr></table>`;
+    case "html": return `<div data-sig-block data-sig-role="block" style="${baseTextStyle()}"><!-- custom html -->Custom HTML block</div>`;
+  }
+  return "";
+}
+
+function setupPaletteDrag(){
+  $$(".pal-item[data-add]").forEach(item=>{
+    item.addEventListener("dragstart",ev=>{ dragKind="palette"; ev.dataTransfer.setData("text/plain", item.getAttribute("data-add")); ev.dataTransfer.effectAllowed="copy"; });
+    item.addEventListener("dragend",()=>{ dragKind=null; removeDropLine(); });
+  });
+}
+
+function onBlockDragStart(ev,b){
+  dragKind="block"; draggedBlock=b; ev.dataTransfer.effectAllowed="move";
+  try{ ev.dataTransfer.setData("text/plain","__block__"); }catch(e){}
+  setTimeout(()=>b.style.opacity="0.4",0);
+}
+function onBlockDragEnd(){ if(draggedBlock) draggedBlock.style.opacity=""; removeDropLine(); dragKind=null; }
+
+function removeDropLine(){ if(dropLine){ dropLine.remove(); dropLine=null; } }
+function showDropLineAt(target, after){
+  removeDropLine();
+  dropLine=el("div",{class:"drop-line","data-chrome":"1"});
+  if(after) target.after(dropLine); else target.before(dropLine);
+}
+
+function setupCanvasDrop(){
+  const paper=$("#paper");
+  paper.addEventListener("dragover",ev=>{
+    if(dragKind!=="palette" && dragKind!=="block") return;
+    ev.preventDefault(); ev.dataTransfer.dropEffect = dragKind==="palette"?"copy":"move";
+    const blocks=$$("[data-sig-block]",paper).filter(b=>b!==draggedBlock);
+    let placed=false;
+    for(const b of blocks){
+      const r=b.getBoundingClientRect();
+      if(ev.clientY < r.top + r.height/2){ showDropLineAt(b,false); placed=true; break; }
+    }
+    if(!placed){ const last=blocks[blocks.length-1]; if(last) showDropLineAt(last,true); else { removeDropLine(); dropLine=el("div",{class:"drop-line","data-chrome":"1"}); paper.appendChild(dropLine); } }
+  });
+  paper.addEventListener("dragleave",ev=>{ if(ev.target===paper) removeDropLine(); });
+  paper.addEventListener("drop",ev=>{
+    if(dragKind!=="palette" && dragKind!=="block") return;
+    ev.preventDefault();
+    const ref=dropLine;
+    if(dragKind==="palette"){
+      const kind=ev.dataTransfer.getData("text/plain");
+      const tmp=el("div",null,newBlockHtml(kind));
+      const node=tmp.firstElementChild;
+      if(ref&&ref.parentNode){ ref.replaceWith(node); } else paper.appendChild(node);
+    } else if(dragKind==="block" && draggedBlock){
+      if(ref&&ref.parentNode){ ref.replaceWith(draggedBlock); } else paper.appendChild(draggedBlock);
+      draggedBlock.style.opacity="";
+    }
+    removeDropLine(); afterStructureChange();
+  });
+}
+
+/* ---- resize handles ---- */
+function attachResize(handle, block){
+  handle.addEventListener("mousedown",ev=>{
+    ev.preventDefault(); ev.stopPropagation();
+    const dir=handle.getAttribute("data-dir");
+    const startX=ev.clientX, startY=ev.clientY;
+    const img = block.tagName==="IMG" ? block : block.querySelector("img");
+    const startW = (img?img.offsetWidth:block.offsetWidth);
+    const startH = block.offsetHeight;
+    function mm(e){
+      let w=startW + (e.clientX-startX);
+      w=Math.max(20, Math.min(600, w));
+      if(dir.includes("e")||dir==="se"){
+        if(img){ img.setAttribute("width",Math.round(w)); img.style.width=Math.round(w)+"px"; }
+        else { block.style.width=Math.round(w)+"px"; }
       }
-    } catch (e) {}
-    // Fallback: select a rendered node and execCommand copy
-    const tmp = document.createElement("div");
-    tmp.style.position = "fixed"; tmp.style.left = "-9999px";
-    tmp.innerHTML = html;
-    document.body.appendChild(tmp);
-    const range = document.createRange();
-    range.selectNode(tmp);
-    const sel = window.getSelection();
-    sel.removeAllRanges(); sel.addRange(range);
-    try {
-      document.execCommand("copy");
-      showToast("Signature copied — paste into your email client");
-    } catch (e) {
-      showToast("Copy failed — use 'Copy HTML' instead", true);
+      if(dir.includes("s")||dir==="se"){
+        const td=block.querySelector && block.querySelector('[style*="height"]');
+      }
     }
-    sel.removeAllRanges();
-    document.body.removeChild(tmp);
-  }
+    function mu(){ document.removeEventListener("mousemove",mm); document.removeEventListener("mouseup",mu); scheduleSyncInspector(); }
+    document.addEventListener("mousemove",mm); document.addEventListener("mouseup",mu);
+  });
+}
 
-  function plainText() {
-    return [state.name, state.title, state.company, state.phone, state.mobile, state.email, state.website, state.address]
-      .filter(Boolean).join("\n");
-  }
+/* ================================================================
+   RAW HTML PANEL — two-way sync + syntax highlight
+   ================================================================ */
+let rawEditing=false;
+function updateRawFromState(){
+  if(rawEditing) return;
+  const ed=$("#rawEditor"); const code=prettyHtml(state.html);
+  ed.value=code; paintHighlight(code); $("#rawMsg").className="msg"; $("#rawMsg").textContent="In sync with design.";
+}
+function paintHighlight(code){ $("#rawHl").innerHTML=highlightHtml(code)+"\n"; }
+function highlightHtml(code){
+  // escape then colorize tags/attrs/strings/comments
+  let out=esc(code);
+  out=out.replace(/&lt;!--[\s\S]*?--&gt;/g, m=>`<span class="t-com">${m}</span>`);
+  out=out.replace(/(&lt;\/?)([a-zA-Z0-9]+)/g, (m,p1,p2)=>`${p1}<span class="t-tag">${p2}</span>`);
+  out=out.replace(/([a-zA-Z-]+)=(&quot;[^&]*?&quot;)/g, (m,a,v)=>`<span class="t-attr">${a}</span>=<span class="t-str">${v}</span>`);
+  return out;
+}
+function prettyHtml(html){
+  // lightweight pretty-print with indentation
+  if(!html) return "";
+  let formatted=""; let indent=0;
+  const tokens=html.replace(/>\s*</g,">\n<").split("\n");
+  const voidTags=/^<(img|br|hr|meta|input|link)[\s>]/i;
+  tokens.forEach(tok=>{
+    tok=tok.trim(); if(!tok) return;
+    if(/^<\//.test(tok)) indent=Math.max(0,indent-1);
+    formatted += "  ".repeat(indent)+tok+"\n";
+    if(/^<[^/!]/.test(tok) && !/\/>$/.test(tok) && !voidTags.test(tok) && !/<\/[a-z0-9]+>$/i.test(tok)) indent++;
+  });
+  return formatted.trim();
+}
 
-  async function copyHtml() {
-    const html = currentHtml();
-    try {
-      await navigator.clipboard.writeText(html);
-      showToast("HTML source copied");
-    } catch (e) {
-      $("#codeArea").focus(); $("#codeArea").select();
-      showToast("Select-all + copy from the HTML tab", true);
+const applyRaw=debounce(function(){
+  const code=$("#rawEditor").value;
+  try{
+    state.html=code.trim();
+    // raw text is authoritative: harvest values FROM the new html into the profile
+    // (don't push profile back over the user's edits)
+    harvestProfileFromDom();
+    const paper=$("#paper"); paper.innerHTML=state.html;
+    applyStyleToDom(paper); decorateBlocks(paper);
+    updateHealth(); updateConnCount(); renderFields(); renderSocials(); persist(); snapshot();
+    $("#rawMsg").className="msg ok"; $("#rawMsg").textContent="Applied to design ✓";
+  }catch(e){
+    $("#rawMsg").className="msg err"; $("#rawMsg").textContent="Parse error: "+e.message;
+  }
+},300);
+
+function setupRawPanel(){
+  const ed=$("#rawEditor");
+  ed.addEventListener("focus",()=>{ rawEditing=true; });
+  ed.addEventListener("blur",()=>{ rawEditing=false; updateRawFromState(); });
+  ed.addEventListener("input",()=>{ paintHighlight(ed.value); applyRaw(); });
+  ed.addEventListener("scroll",()=>{ $("#rawHl").scrollTop=ed.scrollTop; $("#rawHl").scrollLeft=ed.scrollLeft; });
+  $("#btnFormatHtml").addEventListener("click",()=>{ const f=prettyHtml(state.html); ed.value=f; paintHighlight(f); toast("Formatted"); });
+}
+
+/* ================================================================
+   HEALTH CHECKS (deliverability warnings)
+   ================================================================ */
+function updateHealth(){
+  const paper=$("#paper"); const warns=[];
+  const b64=$$('img[src^="data:"]',paper).length; if(b64) warns.push(b64+" embedded image"+(b64>1?"s":"")+" (may be blocked)");
+  const emptyHref=$$('a[href=""],a:not([href])',paper).length; if(emptyHref) warns.push(emptyHref+" empty link"+(emptyHref>1?"s":""));
+  const hint=$("#healthHint");
+  hint.textContent = warns.length? ("⚠ "+warns.join(" · ")) : "✓ email-safe";
+  hint.style.color = warns.length? "var(--warn)" : "var(--good)";
+}
+
+/* ================================================================
+   EXPORT — clean HTML for email
+   ================================================================ */
+function cleanExportHtml(){
+  const tmp=$("#paper").cloneNode(true);
+  stripEditorChrome(tmp);
+  // remove our data-sig-* bookkeeping for a pristine result
+  $$("*",tmp).forEach(n=>{ [...n.attributes].forEach(a=>{ if(a.name.startsWith("data-sig")) n.removeAttribute(a.name); if(a.name==="draggable") n.removeAttribute(a.name); if(a.name==="contenteditable") n.removeAttribute(a.name); }); });
+  return tmp.innerHTML.trim();
+}
+async function copySignature(){
+  const html=cleanExportHtml();
+  const plain=[state.profile.name,state.profile.title,state.profile.company,state.profile.phone,state.profile.email,state.profile.website].filter(Boolean).join("\n");
+  try{
+    if(navigator.clipboard && window.ClipboardItem){
+      await navigator.clipboard.write([new ClipboardItem({ "text/html":new Blob([html],{type:"text/html"}), "text/plain":new Blob([plain],{type:"text/plain"}) })]);
+      toast("Signature copied — paste into your email client"); return;
     }
-  }
+  }catch(e){}
+  // fallback selection copy
+  const t=el("div",{style:"position:fixed;left:-9999px;"}); t.innerHTML=html; document.body.appendChild(t);
+  const rng=document.createRange(); rng.selectNode(t); const sel=getSelection(); sel.removeAllRanges(); sel.addRange(rng);
+  try{ document.execCommand("copy"); toast("Signature copied"); }catch(e){ toast("Copy failed — use Export HTML",true); }
+  sel.removeAllRanges(); t.remove();
+}
 
-  function download() {
-    const doc = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>' + currentHtml() + '</body></html>';
-    const blob = new Blob([doc], { type: "text/html" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "email-signature.html";
-    a.click();
-    URL.revokeObjectURL(a.href);
-    showToast("Downloaded email-signature.html");
-  }
+/* ================================================================
+   IMPORT — from clipboard (rich/plain) or file, + recognizer
+   ================================================================ */
+function openImportModal(){
+  setModal("Import signature / template", `
+    <p class="hint">Paste HTML (or a rich signature copied from an email), or load a file. We'll try to auto-recognize photo, name, links, etc. You can review and fix the connections next.</p>
+    <div class="field" style="margin-top:12px;">
+      <label>Paste HTML here</label>
+      <textarea id="impPaste" class="paste-area" placeholder="&lt;table&gt;…your signature html…&lt;/table&gt;"></textarea>
+    </div>
+    <div class="row2" style="margin-top:6px;">
+      <button class="btn secondary small" id="impFromClip">⎘ Paste from clipboard (rich)</button>
+      <button class="btn secondary small" id="impFromFile">📄 Load .html / .json file</button>
+    </div>
+    <div class="file-drop" id="impDrop" style="margin-top:10px;">Drop a .html or .json file here</div>
+    <div class="checkbox-group" style="margin-top:12px;">
+      <div class="checkrow"><input type="checkbox" id="impNormalize" checked><label for="impNormalize">Normalize to clean standard structure on import</label></div>
+      <div class="checkrow"><input type="checkbox" id="impReview" checked><label for="impReview">Open connection review after import</label></div>
+    </div>
+    <div class="warnbox">Base64-embedded images are flagged — host images and use URLs for reliable delivery.</div>
+  `, [
+    {label:"Cancel", cls:"ghost", act:closeModal},
+    {label:"Import", cls:"", act:()=>doImportHtml($("#impPaste").value)}
+  ]);
+  $("#impFromClip").addEventListener("click",importFromClipboard);
+  $("#impFromFile").addEventListener("click",()=>pickFile(handleFile));
+  const drop=$("#impDrop");
+  drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("over");});
+  drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
+  drop.addEventListener("drop",e=>{ e.preventDefault(); drop.classList.remove("over"); const f=e.dataTransfer.files[0]; if(f) handleFile(f); });
+  drop.addEventListener("click",()=>pickFile(handleFile));
+}
 
-  // ---------- Templates ----------
-  const TEMPLATE_DEFAULTS = {
-    classic:  { imageShape: "circle",  showDivider: true  },
-    stacked:  { imageShape: "square",  showDivider: true  },
-    divider:  { imageShape: "round",   showDivider: false },
-    logo:     { imageShape: "square",  showDivider: false }
+async function importFromClipboard(){
+  try{
+    if(navigator.clipboard && navigator.clipboard.read){
+      const items=await navigator.clipboard.read();
+      for(const it of items){
+        if(it.types.includes("text/html")){ const blob=await it.getType("text/html"); const html=await blob.text(); $("#impPaste").value=extractBody(html); toast("Pulled rich HTML from clipboard"); return; }
+      }
+      // fallback to text
+      const txt=await navigator.clipboard.readText(); $("#impPaste").value=txt; toast("Pulled text from clipboard"); return;
+    }
+    const txt=await navigator.clipboard.readText(); $("#impPaste").value=txt;
+  }catch(e){ toast("Clipboard read blocked — paste manually (Ctrl+V)", true); }
+}
+function extractBody(html){ const m=html.match(/<body[^>]*>([\s\S]*?)<\/body>/i); return (m?m[1]:html).trim(); }
+
+function doImportHtml(html){
+  if(!html || !html.trim()){ toast("Nothing to import",true); return; }
+  html=extractBody(html);
+  const doNorm=$("#impNormalize") && $("#impNormalize").checked;
+  const doReview=$("#impReview") && $("#impReview").checked;
+  // recognize roles heuristically on a detached tree
+  const tmp=document.createElement("div"); tmp.innerHTML=html;
+  markBlocks(tmp);
+  recognizeRoles(tmp);
+  state.html = doNorm ? normalizeStructure(tmp) : tmp.innerHTML.trim();
+  // pull recognized values into profile
+  harvestProfileFromDom();
+  snapshot(); renderAll(); persist(); closeModal();
+  toast("Imported"+(doNorm?" & normalized":""));
+  if(doReview) openReviewModal();
+}
+
+/* give every top-level-ish element a data-sig-block marker so it's editable */
+function markBlocks(root){
+  // mark direct children of root and common containers
+  const marks=root.children;
+  // also mark tables, imgs, anchors groups
+  $$("table,img,a,div,p,span",root).forEach(n=>{});
+  Array.from(root.querySelectorAll("img,table")).forEach(n=>{ if(!n.hasAttribute("data-sig-block")) n.setAttribute("data-sig-block",""); });
+  Array.from(root.children).forEach(n=>{ if(!n.hasAttribute("data-sig-block")) n.setAttribute("data-sig-block",""); });
+}
+
+/* heuristic recognizer */
+function recognizeRoles(root){
+  // images: first image = photo/logo; banner = widest/last wide image
+  const imgs=$$("img",root);
+  if(imgs.length){
+    imgs[0].setAttribute("data-sig-role","photo");
+    if(imgs.length>1) imgs[imgs.length-1].setAttribute("data-sig-role", (parseInt(imgs[imgs.length-1].getAttribute("width"))||0)>240?"banner":"logo");
+  }
+  // social: anchors whose href matches known networks → group into existing table/row or tag the anchor's row
+  const socialHosts={linkedin:/linkedin\.com/i,twitter:/(twitter|x)\.com/i,github:/github\.com/i,instagram:/instagram\.com/i,facebook:/facebook\.com/i,youtube:/(youtube|youtu\.be)/i};
+  const found=[];
+  $$("a",root).forEach(a=>{ const h=a.getAttribute("href")||""; for(const k in socialHosts){ if(socialHosts[k].test(h)){ found.push({type:k,url:h}); break; } } });
+  if(found.length){ state.__importedSocials=found; }
+  // email / phone / website via anchors
+  $$("a",root).forEach(a=>{ const h=a.getAttribute("href")||""; if(/^mailto:/i.test(h)) a.setAttribute("data-sig-role","email"); else if(/^tel:/i.test(h)) a.setAttribute("data-sig-role","phone"); });
+  // name: the largest-font text or first strong/b or h1-h3
+  const heading=root.querySelector("h1,h2,h3,b,strong");
+  if(heading){ const holder=heading.closest("[data-sig-block]")||heading; holder.setAttribute("data-sig-role","name"); }
+  // website: anchor with http but not social/mailto/tel
+  $$("a",root).forEach(a=>{ const h=a.getAttribute("href")||""; if(/^https?:/i.test(h) && !Object.values(socialHosts).some(rx=>rx.test(h)) && !a.getAttribute("data-sig-role")){ a.setAttribute("data-sig-role","website"); } });
+}
+
+function harvestProfileFromDom(){
+  const paper=document.createElement("div"); paper.innerHTML=state.html;
+  ROLES.forEach(r=>{
+    const n=paper.querySelector(`[data-sig-role="${r.key}"]`); if(!n) return;
+    if(r.type==="image"){ const img=n.tagName==="IMG"?n:n.querySelector("img"); if(img){ const v=img.getAttribute("src"); if(v) state.profile[r.key]=v; } }
+    else { const v=(n.textContent||"").trim(); if(v) state.profile[r.key]=v; }
+  });
+  if(state.__importedSocials && state.__importedSocials.length){
+    state.socials = state.__importedSocials.map(s=>({id:uid("s"),type:s.type,url:s.url}));
+    delete state.__importedSocials;
+  }
+}
+
+/* ================================================================
+   NORMALIZE — rewrite to canonical structure
+   ================================================================ */
+function normalizeStructure(root){
+  // Build a fresh standard stacked layout from recognized roles, preserving values.
+  const get=(key,attr)=>{ const n=root.querySelector(`[data-sig-role="${key}"]`); if(!n) return ""; if(attr==="src"){ const img=n.tagName==="IMG"?n:n.querySelector("img"); return img?img.getAttribute("src"):""; } return (n.textContent||"").trim(); };
+  // temporarily stash into profile to reuse infoStack generator
+  const prev=deepClone(state.profile);
+  state.profile.photo=get("photo","src")||prev.photo;
+  state.profile.logo=get("logo","src")||prev.logo;
+  state.profile.name=get("name")||prev.name;
+  ["title","company","tagline","phone","mobile","email","website","address","disclaimer"].forEach(k=>{ const v=get(k); if(v) state.profile[k]=v; });
+  const html = STARTERS.classic();
+  return html;
+}
+function normalizeInPlace(){
+  const tmp=document.createElement("div"); tmp.innerHTML=state.html; markBlocks(tmp); recognizeRoles(tmp);
+  state.html=normalizeStructure(tmp); harvestProfileFromDom(); snapshot(); renderAll(); persist(); toast("Normalized to standard structure");
+}
+
+/* ================================================================
+   CONNECTION REVIEW modal (side-by-side)
+   ================================================================ */
+function openReviewModal(){
+  const defs=allFieldDefs();
+  setModal("Connection review", `
+    <p class="hint">Green = connected. Hover a field or an element to see its match light up. Click “Connect” then click the matching element in the preview to wire an unconnected field.</p>
+    <div class="review-grid" style="margin-top:12px;">
+      <div class="review-col"><h4>Fields</h4><div class="review-fields" id="rvFields"></div></div>
+      <div class="review-col"><h4>Design</h4><div class="review-preview" id="rvPreview"></div></div>
+    </div>
+  `, [ {label:"Normalize now", cls:"ghost", act:()=>{ normalizeInPlace(); closeModal(); }}, {label:"Done", cls:"", act:closeModal} ]);
+  const prev=$("#rvPreview"); prev.innerHTML=cleanExportButKeepRoles();
+  const fields=$("#rvFields");
+  defs.forEach(d=>{
+    const target=prev.querySelector(`[data-sig-role="${d.key}"]`);
+    const bound=!!target;
+    const row=el("div",{class:"cfield"+(bound?" connected":"")});
+    const head=el("div",{class:"chead"});
+    head.appendChild(el("span",{class:"status"}));
+    head.appendChild(el("span",{class:"clabel"}, d.label));
+    head.appendChild(el("span",{class:"cbind"+(bound?"":" unbound")}, bound?"● linked":"○ not linked"));
+    row.appendChild(head);
+    const btn=el("button",{class:"btn ghost small"}, bound?"Re-connect":"Connect");
+    btn.addEventListener("click",()=>startReviewConnect(d.key, prev, btn));
+    row.appendChild(btn);
+    row.addEventListener("mouseenter",()=>{ const t=prev.querySelector(`[data-sig-role="${d.key}"]`); if(t)t.classList.add("rv-mark"); });
+    row.addEventListener("mouseleave",()=>{ const t=prev.querySelector(`[data-sig-role="${d.key}"]`); if(t)t.classList.remove("rv-mark"); });
+    fields.appendChild(row);
+  });
+}
+function cleanExportButKeepRoles(){ const t=$("#paper").cloneNode(true); stripEditorChrome(t); return t.innerHTML; }
+let reviewConnect=null;
+function startReviewConnect(key, prev, btn){
+  reviewConnect=key; btn.textContent="Click an element…";
+  const handler=(ev)=>{
+    const b=ev.target.closest("[data-sig-role],img,a,td,div,table"); if(!b) return;
+    ev.preventDefault(); ev.stopPropagation();
+    // set role in the real paper by matching index/outerHTML is tricky; simplest: set on preview then rebuild
+    prev.querySelectorAll(`[data-sig-role="${key}"]`).forEach(n=>n.removeAttribute("data-sig-role"));
+    b.setAttribute("data-sig-role",key);
+    state.html=prev.innerHTML; // adopt preview edits
+    harvestProfileFromDom(); renderAll(); persist();
+    prev.removeEventListener("click",handler,true);
+    openReviewModal(); // refresh
+    toast("Connected "+key);
   };
+  prev.addEventListener("click",handler,true);
+}
 
-  function applyTemplate(name) {
-    state.template = name;
-    Object.assign(state, TEMPLATE_DEFAULTS[name] || {});
-    manualHtml = null;
-    save(); syncFormFromState(); render();
-    showToast("Template applied: " + name);
-  }
+/* in-canvas connect mode (from banner) */
+const connectMode={active:false,key:null};
+function completeConnect(block){
+  if(!connectMode.active) return;
+  connectRoleToBlock(connectMode.key, block);
+  connectMode.active=false; connectMode.key=null;
+  $("#connectBanner").classList.remove("show");
+}
 
-  // ---------- Tabs ----------
-  function setupTabs() {
-    $$(".tab").forEach(tab => {
-      tab.addEventListener("click", () => {
-        $$(".tab").forEach(t => t.classList.remove("active"));
-        $$(".tab-pane").forEach(p => p.classList.remove("active"));
-        tab.classList.add("active");
-        $('[data-pane="' + tab.getAttribute("data-tab") + '"]').classList.add("active");
-      });
-    });
-  }
+/* ================================================================
+   SAVE / EXPORT modal (granular)
+   ================================================================ */
+function openSaveModal(){
+  setModal("Save / Export", `
+    <p class="hint">Export standardized JSON you can re-import in parts — e.g. import only the style into another signature, or only your user info.</p>
+    <div class="checkbox-group" style="margin-top:12px;">
+      <h4 style="margin:4px 0;color:var(--muted);font-size:12px;">Export JSON</h4>
+      <button class="btn secondary small" data-exp="full">⬇ Full signature (everything)</button>
+      <button class="btn secondary small" data-exp="style">⬇ Style only</button>
+      <button class="btn secondary small" data-exp="profile">⬇ User info / profile only</button>
+      <button class="btn secondary small" data-exp="template">⬇ Template (layout + style)</button>
+      <h4 style="margin:10px 0 4px;color:var(--muted);font-size:12px;">Export HTML</h4>
+      <button class="btn secondary small" data-exp="html">⬇ Clean email HTML (.html)</button>
+      <button class="btn secondary small" data-exp="copyhtml">⎘ Copy clean HTML to clipboard</button>
+    </div>
+  `, [ {label:"Close", cls:"ghost", act:closeModal} ]);
+  $$("#modalBody [data-exp]").forEach(b=>b.addEventListener("click",()=>exportAs(b.getAttribute("data-exp"))));
+}
+function download(name, text, type){
+  const blob=new Blob([text],{type:type||"application/json"}); const a=el("a",{href:URL.createObjectURL(blob),download:name}); a.click(); URL.revokeObjectURL(a.href);
+}
+function exportAs(kind){
+  const meta={ __sig:true, version:2, kind };
+  if(kind==="full"){ download("signature-full.json", JSON.stringify(Object.assign(meta,{ profile:state.profile, socials:state.socials, style:state.style, html:state.html, customFields:state.customFields }),null,2)); }
+  else if(kind==="style"){ download("signature-style.json", JSON.stringify(Object.assign(meta,{ style:state.style }),null,2)); }
+  else if(kind==="profile"){ download("signature-profile.json", JSON.stringify(Object.assign(meta,{ profile:state.profile, socials:state.socials, customFields:state.customFields }),null,2)); }
+  else if(kind==="template"){ download("signature-template.json", JSON.stringify(Object.assign(meta,{ html:state.html, style:state.style }),null,2)); }
+  else if(kind==="html"){ download("signature.html", "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body>"+cleanExportHtml()+"</body></html>","text/html"); }
+  else if(kind==="copyhtml"){ navigator.clipboard && navigator.clipboard.writeText(cleanExportHtml()); toast("Clean HTML copied"); return; }
+  toast("Exported "+kind);
+}
 
-  // ---------- Events ----------
-  function setup() {
-    syncFormFromState();
-    setupTabs();
-    render();
+/* import a .json (any subset) or .html file */
+function pickFile(cb){ const inp=$("#hiddenFile"); inp.value=""; inp.onchange=()=>{ if(inp.files[0]) cb(inp.files[0]); }; inp.click(); }
+function handleFile(file){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const txt=reader.result;
+    if(/\.json$/i.test(file.name) || /^\s*\{/.test(txt)){
+      try{ applyJsonImport(JSON.parse(txt)); }catch(e){ toast("Invalid JSON: "+e.message,true); }
+    } else {
+      $("#impPaste") ? ($("#impPaste").value=txt) : doImportHtml(txt);
+      toast("Loaded HTML into paste box");
+    }
+  };
+  reader.readAsText(file);
+}
+function applyJsonImport(o){
+  if(!o || typeof o!=="object"){ toast("Unrecognized file",true); return; }
+  let applied=[];
+  if(o.style){ state.style=Object.assign(deepClone(DEFAULT_STYLE), o.style); applied.push("style"); }
+  if(o.profile){ state.profile=Object.assign(deepClone(DEFAULT_PROFILE), o.profile); applied.push("profile"); }
+  if(o.socials){ state.socials=o.socials; applied.push("socials"); }
+  if(o.customFields){ state.customFields=o.customFields; }
+  if(o.html){ state.html=o.html; applied.push("layout"); }
+  snapshot(); renderAll(); persist(); closeModal();
+  toast("Imported: "+(applied.join(", ")||"nothing recognized"));
+}
 
-    document.addEventListener("input", e => {
-      if (e.target.matches("[data-field]")) onFieldInput(e);
-      else if (e.target.matches("[data-color]")) onColorInput(e);
-    });
+/* ================================================================
+   MODAL plumbing
+   ================================================================ */
+function setModal(title, bodyHtml, buttons){
+  $("#modalTitle").textContent=title; $("#modalBody").innerHTML=bodyHtml;
+  const foot=$("#modalFoot"); foot.innerHTML="";
+  (buttons||[]).forEach(b=>{ const btn=el("button",{class:"btn "+(b.cls||"")}, b.label); btn.addEventListener("click",b.act); foot.appendChild(btn); });
+  $("#modalBack").classList.add("show");
+}
+function closeModal(){ $("#modalBack").classList.remove("show"); }
 
-    $("#btnAddLink").addEventListener("click", () => {
-      state.links = state.links || [];
-      state.links.push({ type: "linkedin", url: "" });
-      save(); renderLinks(); render();
-    });
+/* ================================================================
+   WIRING / INIT
+   ================================================================ */
+function bindUI(){
+  // side tabs
+  $$(".side-tab").forEach(t=>t.addEventListener("click",()=>switchSideTab(t.getAttribute("data-tab"))));
+  // device / bg / edit
+  $$(".pill[data-device]").forEach(p=>p.addEventListener("click",()=>{ state.device=p.getAttribute("data-device"); applyDeviceBg(); persist(); }));
+  $("#bgPill").addEventListener("click",()=>{ state.bg = state.bg==="dark"?"light":"dark"; applyDeviceBg(); persist(); });
+  $("#editPill").addEventListener("click",()=>{ state.editMode=!state.editMode; applyDeviceBg(); });
+  $("#normalizePill").addEventListener("click",normalizeInPlace);
+  // raw toggle
+  $("#btnToggleRaw").addEventListener("click",()=>{ state.rawOpen=!state.rawOpen; $("#rawPanel").classList.toggle("collapsed",!state.rawOpen); if(state.rawOpen) updateRawFromState(); });
+  // header actions
+  $("#btnImport").addEventListener("click",openImportModal);
+  $("#btnSaveMenu").addEventListener("click",openSaveModal);
+  $("#btnCopy").addEventListener("click",copySignature);
+  $("#btnUndo").addEventListener("click",undo);
+  $("#btnRedo").addEventListener("click",redo);
+  // sidebar adders
+  $("#btnAddField").addEventListener("click",addCustomField);
+  $("#btnAddSocial").addEventListener("click",()=>{ state.socials.push({id:uid("s"),type:"linkedin",url:""}); renderSocials(); });
+  $("#btnSaveTpl").addEventListener("click",saveTemplate);
+  // modal close
+  $("#modalClose").addEventListener("click",closeModal);
+  $("#modalBack").addEventListener("click",e=>{ if(e.target===$("#modalBack")) closeModal(); });
+  // connect banner cancel
+  $("#connectCancel").addEventListener("click",()=>{ connectMode.active=false; $("#connectBanner").classList.remove("show"); });
+  // click empty paper deselects
+  $("#stage").addEventListener("click",e=>{ if(e.target.id==="stage"||e.target.id==="paper"){ selectBlock(null); openInspectorFor(null); } });
+  // keyboard
+  document.addEventListener("keydown",e=>{
+    const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) || document.activeElement.isContentEditable;
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="z" && !e.shiftKey){ e.preventDefault(); undo(); }
+    else if((e.ctrlKey||e.metaKey) && (e.key.toLowerCase()==="y" || (e.key.toLowerCase()==="z" && e.shiftKey))){ e.preventDefault(); redo(); }
+    else if(!typing && (e.key==="Delete"||e.key==="Backspace") && selectedBlock){ e.preventDefault(); deleteBlock(selectedBlock); }
+  });
+  setupPaletteDrag();
+  setupCanvasDrop();
+  setupRawPanel();
+}
 
-    $$(".template-card").forEach(c =>
-      c.addEventListener("click", () => applyTemplate(c.getAttribute("data-template"))));
+function init(){
+  loadPersisted();
+  bindUI();
+  renderAll();
+  snapshot();
+  updateUndoButtons();
+}
 
-    $("#imageUpload").addEventListener("change", e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        state.imageUrl = reader.result;
-        $('[data-field="imageUrl"]').value = "(embedded upload)";
-        manualHtml = null; save(); render();
-        showToast("Image embedded — remember hosting is more reliable");
-      };
-      reader.readAsDataURL(file);
-    });
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init);
+else init();
 
-    $("#btnApplyCode").addEventListener("click", () => {
-      manualHtml = $("#codeArea").value;
-      render();
-      $("#previewContent").innerHTML = manualHtml; // honor manual edits exactly
-      showToast("Applied custom HTML");
-    });
-    $("#btnRegen").addEventListener("click", () => {
-      manualHtml = null; render(); showToast("Regenerated from form");
-    });
-
-    $("#btnCopy").addEventListener("click", copyRich);
-    $("#btnCopyTop").addEventListener("click", copyRich);
-    $("#btnCopyHtml").addEventListener("click", copyHtml);
-    $("#btnDownload").addEventListener("click", download);
-
-    $("#btnReset").addEventListener("click", () => {
-      if (!confirm("Reset everything to defaults?")) return;
-      state = JSON.parse(JSON.stringify(DEFAULT));
-      manualHtml = null; save(); syncFormFromState(); render();
-      showToast("Reset to defaults");
-    });
-
-    $$(".pill[data-device]").forEach(p => p.addEventListener("click", () => {
-      $$(".pill[data-device]").forEach(x => x.classList.remove("active"));
-      p.classList.add("active");
-      $("#previewFrame").classList.toggle("mobile", p.getAttribute("data-device") === "mobile");
-    }));
-
-    $("#bgToggle").addEventListener("click", () => {
-      const frame = $("#previewFrame");
-      const dark = frame.style.background === "rgb(45, 45, 60)";
-      frame.style.background = dark ? "#ffffff" : "#2d2d3c";
-      $("#bgToggle").textContent = dark ? "◻️ Light bg" : "◼️ Dark bg";
-    });
-  }
-
-  document.addEventListener("DOMContentLoaded", setup);
 })();
 </script>
 </body>
