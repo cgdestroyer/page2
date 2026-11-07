@@ -223,6 +223,21 @@
   /* drop indicator when reordering */
   .drop-line { height: 3px; background: var(--accent); border-radius: 2px; margin: 2px 0; box-shadow: 0 0 8px var(--accent); }
 
+  /* hover bounding box overlay on the canvas (shows role connection) */
+  .canvas-box { position: fixed; display: none; border: 2px solid var(--accent); border-radius: 4px; pointer-events: none; z-index: 40; box-shadow: 0 0 0 2px rgba(108,140,255,.2); }
+  .canvas-box.show { display: block; }
+  .canvas-box.ok { border-color: var(--good); box-shadow: 0 0 0 2px rgba(53,192,138,.2); }
+  .canvas-box.warn { border-color: var(--warn); box-shadow: 0 0 0 2px rgba(230,179,77,.2); }
+  .canvas-box .cb-label { position: absolute; top: -19px; left: -2px; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 4px 4px 0 0; white-space: nowrap; color: #fff; background: var(--accent); }
+  .canvas-box.ok .cb-label { background: var(--good); color: #042a1c; }
+  .canvas-box.warn .cb-label { background: var(--warn); color: #3a2a04; }
+
+  /* compact field rows */
+  .mini-btn { background: var(--panel-3); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; font-size: 10px; padding: 3px 7px; cursor: pointer; flex: 0 0 auto; }
+  .mini-btn:hover { border-color: var(--accent); color: var(--text); }
+  .mini-btn.connect { color: var(--accent); border-color: var(--accent); }
+  .cfield-input { margin-top: 7px; }
+
   /* connect-mode banner */
   .connect-banner {
     display: none; align-items: center; gap: 10px; padding: 8px 14px; background: var(--good-dim);
@@ -276,6 +291,19 @@
   .review-preview { background: #fff; border-radius: 8px; padding: 18px; max-height: 420px; overflow: auto; }
   .review-fields { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow: auto; padding-right: 4px; }
   .rv-mark { outline: 2px solid var(--good) !important; outline-offset: 1px; background: rgba(53,192,138,.12); }
+  .rv-hover { outline: 2px solid var(--accent) !important; outline-offset: 1px; background: rgba(108,140,255,.1); }
+  .review-preview { position: relative; }
+  .rv-boxlabel { position: absolute; display: none; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 5px; pointer-events: none; z-index: 5; white-space: nowrap; transform: translateY(-2px); }
+  .rv-boxlabel.show { display: block; }
+  .rv-boxlabel.ok { background: var(--good); color: #042a1c; }
+  .rv-boxlabel.warn { background: var(--warn); color: #3a2a04; }
+  .rv-filter { display: flex; gap: 6px; margin-top: 10px; }
+  .rv-chip { font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; cursor: pointer; user-select: none; }
+  .rv-chip:hover { color: var(--text); }
+  .rv-chip.active { color: #fff; border-color: var(--accent); background: var(--accent); }
+  .cfield.compact { padding: 7px 9px; }
+  .cfield.compact .chead { margin-bottom: 0; }
+  .cfield.compact .clabel { font-size: 12px; }
 
   .hint { font-size: 11px; color: var(--faint); line-height: 1.5; margin: 6px 0 0; }
   .warnbox { background: rgba(230,179,77,.1); border: 1px solid rgba(230,179,77,.35); color: #f0cd84; border-radius: 8px; padding: 9px 11px; font-size: 11.5px; line-height: 1.5; margin-top: 8px; }
@@ -336,8 +364,13 @@
       <div class="side-pane active" data-pane="content">
         <div class="section">
           <h3>Profile fields <span class="badge" id="connCount">0/0</span></h3>
-          <p class="hint">Edit values here; they update the design live. If a pasted template isn't wired up, drag an element from the canvas onto a field to connect it. Hover a field to highlight its linked element.</p>
-          <div id="fieldsHost" style="margin-top:10px;"></div>
+          <p class="hint">Hover a field to outline its element in the design. Hover the design to see which field it maps to. Drag a canvas element onto a field to connect it.</p>
+          <div class="rv-filter" id="fieldFilter" style="margin:8px 0;">
+            <span class="rv-chip active" data-f="all">All</span>
+            <span class="rv-chip" data-f="connected">● Linked</span>
+            <span class="rv-chip" data-f="unlinked">○ Unlinked</span>
+          </div>
+          <div id="fieldsHost"></div>
           <button class="btn ghost small" id="btnAddField" style="margin-top:8px;">+ Custom field</button>
         </div>
         <div class="section">
@@ -416,6 +449,7 @@
       <div class="canvas-shell desktop editing" id="canvasShell">
         <div class="paper" id="paper"></div>
       </div>
+      <div class="canvas-box" id="canvasBox"><span class="cb-label" id="canvasBoxLabel"></span></div>
     </div>
   </main>
 
@@ -480,6 +514,7 @@ function debounce(fn, ms){ let t; return function(){ clearTimeout(t); const a=ar
 const ROLES = [
   { key:"photo",      label:"Photo",            type:"image" },
   { key:"logo",       label:"Logo",             type:"image" },
+  { key:"signature",  label:"Signature",        type:"image" },
   { key:"name",       label:"Name",             type:"text"  },
   { key:"title",      label:"Job title",        type:"text"  },
   { key:"company",    label:"Company / Org",    type:"text"  },
@@ -518,6 +553,7 @@ const DEFAULT_STYLE = {
 const DEFAULT_PROFILE = {
   photo:"https://i.pravatar.cc/200?img=12",
   logo:"",
+  signature:"",
   name:"Jordan Rivera",
   title:"Senior Product Designer",
   company:"Northwind Studio",
@@ -665,13 +701,19 @@ function infoStack(){
   return h;
 }
 
+function signatureRow(){ const p=state.profile; if(!p.signature) return ""; return `<tr><td colspan="2" style="padding-bottom:8px;">${imgTag("signature",p.signature,180,"signature")}</td></tr>`; }
+function logoRowBelow(){ const p=state.profile; if(!p.logo) return ""; return `<tr><td colspan="2" style="padding-top:10px;">${imgTag("logo",p.logo,120,p.company)}</td></tr>`; }
+
 const STARTERS = {
   classic(){ const p=state.profile;
-    return `<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;"><tr>`+
-      `<td style="vertical-align:top;padding-right:18px;">${imgTag("photo",p.photo,90,p.name)}</td>`+
-      `<td style="vertical-align:top;">${infoStack()}</td></tr></table>`;
+    return `<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;">`+
+      signatureRow()+
+      `<tr><td style="vertical-align:top;padding-right:18px;">${imgTag("photo",p.photo,90,p.name)}</td>`+
+      `<td style="vertical-align:top;">${infoStack()}</td></tr>`+
+      logoRowBelow()+
+      `</table>`;
   },
-  stacked(){ return `<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;"><tr><td style="vertical-align:top;">${infoStack()}</td></tr></table>`; },
+  stacked(){ return `<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;">`+signatureRow()+`<tr><td style="vertical-align:top;">${infoStack()}</td></tr>`+logoRowBelow()+`</table>`; },
   divider(){ const p=state.profile; const s=S();
     return `<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;"><tr>`+
       `<td style="vertical-align:top;padding-right:16px;">${imgTag("photo",p.photo,80,p.name)}</td>`+
@@ -918,40 +960,58 @@ function allFieldDefs(){
 }
 function roleBoundBlock(key){ return $(`#paper [data-sig-role="${key}"]`); }
 
+let fieldFilter="all";
 function renderFields(){
-  const host=$("#fieldsHost"); host.innerHTML="";
+  const host=$("#fieldsHost"); if(!host) return; host.innerHTML="";
   allFieldDefs().forEach(def=>{
     const bound = !!roleBoundBlock(def.key);
+    if(fieldFilter==="connected" && !bound) return;
+    if(fieldFilter==="unlinked" && bound) return;
     const val = def.custom ? (state.customFields.find(f=>f.key===def.key)||{}).value : state.profile[def.key];
-    const wrap=el("div",{ class:"cfield"+(bound?" connected":""), "data-role":def.key });
+    const wrap=el("div",{ class:"cfield compact"+(bound?" connected":""), "data-role":def.key });
+
+    // compact head: [dot] label ............ [input toggle] [Connect/Disconnect]
     const head=el("div",{class:"chead"});
     head.appendChild(el("span",{class:"status"}));
     head.appendChild(el("span",{class:"clabel"}, esc(def.label)));
-    head.appendChild(el("span",{class:"ctype"}, def.type));
-    const bindTag=el("span",{class:"cbind"+(bound?"":" unbound")}, bound?"● linked":"○ not linked");
-    head.appendChild(bindTag);
-    if(bound){ const un=el("button",{class:"unlink",title:"Disconnect"},"⦸"); un.addEventListener("click",()=>unlinkRole(def.key)); head.appendChild(un); }
-    if(def.custom){ const del=el("button",{class:"unlink",title:"Remove field"},"×"); del.addEventListener("click",()=>{ state.customFields=state.customFields.filter(f=>f.key!==def.key); renderFields(); }); head.appendChild(del); }
+    head.appendChild(el("span",{class:"cbind"+(bound?"":" unbound")}, bound?"linked":"—"));
+    // edit toggle (show/hide value input)
+    const editBtn=el("button",{class:"mini-btn",title:"Edit value"},"✎");
+    head.appendChild(editBtn);
+    // connect / disconnect inline
+    if(bound){
+      const un=el("button",{class:"mini-btn",title:"Disconnect"},"⦸");
+      un.addEventListener("click",()=>unlinkRole(def.key));
+      head.appendChild(un);
+    } else {
+      const cbtn=el("button",{class:"mini-btn connect",title:"Click then click an element in the design"},"link");
+      cbtn.addEventListener("click",()=>startCanvasConnect(def.key));
+      head.appendChild(cbtn);
+    }
+    if(def.custom){ const del=el("button",{class:"mini-btn",title:"Remove field"},"×"); del.addEventListener("click",()=>{ state.customFields=state.customFields.filter(f=>f.key!==def.key); renderFields(); }); head.appendChild(del); }
     wrap.appendChild(head);
 
+    // value input (hidden by default to keep compact; shown on toggle or when it has focus)
     let input;
-    if(def.type==="image"){
-      input=el("input",{type:"url",placeholder:"Image URL", value:esc(val||"")});
-    } else if(def.type==="email"){ input=el("input",{type:"email", value:esc(val||"")}); }
+    if(def.type==="image"){ input=el("input",{type:"url",placeholder:"Image URL", value:esc(val||"")}); }
+    else if(def.type==="email"){ input=el("input",{type:"email", value:esc(val||"")}); }
     else if(def.type==="url"){ input=el("input",{type:"url", value:esc(val||"")}); }
     else { input=el("input",{type:"text", value:esc(val||"")}); }
+    input.className="cfield-input";
+    input.style.display = (val||def.type==="image") ? "block" : "none";
     input.addEventListener("input",()=>{
       if(def.custom){ const f=state.customFields.find(x=>x.key===def.key); if(f) f.value=input.value; }
       else state.profile[def.key]=input.value;
       snapshot(); renderCanvas(); persist();
     });
+    editBtn.addEventListener("click",()=>{ input.style.display = input.style.display==="none"?"block":"none"; if(input.style.display==="block") input.focus(); });
     wrap.appendChild(input);
 
-    // hover highlight both ways
+    // hover highlight both ways (field -> design bounding box)
     wrap.addEventListener("mouseenter",()=>highlightRole(def.key,true));
     wrap.addEventListener("mouseleave",()=>highlightRole(def.key,false));
 
-    // drag-to-connect: this field is a drop target for canvas blocks
+    // drag-to-connect: field is a drop target for canvas blocks
     wrap.addEventListener("dragover",ev=>{ if(dragKind==="block"){ ev.preventDefault(); wrap.classList.add("droptarget"); } });
     wrap.addEventListener("dragleave",()=>wrap.classList.remove("droptarget"));
     wrap.addEventListener("drop",ev=>{ ev.preventDefault(); wrap.classList.remove("droptarget"); if(draggedBlock){ connectRoleToBlock(def.key, draggedBlock); } });
@@ -962,11 +1022,45 @@ function renderFields(){
 }
 
 function highlightRole(key, on){
-  const b=roleBoundBlock(key); if(b) b.classList.toggle("highlight", on);
+  const b=roleBoundBlock(key); if(b){ b.classList.toggle("highlight", on); if(on) showCanvasBox(b, (ROLE_BY_KEY[key]||{}).label||key, true); else hideCanvasBox(); }
   const f=$(`#fieldsHost .cfield[data-role="${key}"]`); if(f) f.classList.toggle("highlight", on);
 }
 
+/* click a field's "link" button, then click an element in the canvas */
+function startCanvasConnect(key){
+  connectMode.active=true; connectMode.key=key;
+  const def=ROLE_BY_KEY[key]||(state.customFields||[]).find(f=>f.key===key);
+  $("#connectFieldName").textContent = def?def.label:key;
+  $("#connectBanner").classList.add("show");
+  toast("Now click the matching element in the design");
+}
+
+/* ---- canvas hover bounding box overlay ---- */
+function showCanvasBox(target, label, ok){
+  const box=$("#canvasBox"); if(!box||!target||!target.getBoundingClientRect) return;
+  const r=target.getBoundingClientRect();
+  if(r.width===0 && r.height===0){ hideCanvasBox(); return; }
+  box.className="canvas-box show "+(ok?"ok":"warn");
+  box.style.left=(r.left-2)+"px"; box.style.top=(r.top-2)+"px";
+  box.style.width=(r.width+4)+"px"; box.style.height=(r.height+4)+"px";
+  $("#canvasBoxLabel").textContent=label;
+}
+function hideCanvasBox(){ const box=$("#canvasBox"); if(box) box.className="canvas-box"; }
+
+/* hovering a block in the canvas -> outline it + light up its left field */
+function onCanvasHover(ev){
+  if(connectMode.active) return;
+  const b=ev.target.closest && ev.target.closest("[data-sig-block]");
+  if(!b){ hideCanvasBox(); $$("#fieldsHost .cfield.highlight").forEach(f=>f.classList.remove("highlight")); return; }
+  const role=b.getAttribute("data-sig-role");
+  const def=role && (ROLE_BY_KEY[role] || (state.customFields||[]).find(f=>f.key===role));
+  showCanvasBox(b, def?("● "+def.label):"○ not connected", !!def);
+  $$("#fieldsHost .cfield").forEach(f=>f.classList.toggle("highlight", role && f.getAttribute("data-role")===role));
+}
+
 function connectRoleToBlock(key, block){
+  block = tightestBlock(block) || block;
+  if(!block.hasAttribute("data-sig-block")) block.setAttribute("data-sig-block","");
   // remove role from any previous holder of this key, set on new block
   $$(`#paper [data-sig-role="${key}"]`).forEach(n=>{ if(n!==block) n.removeAttribute("data-sig-role"); });
   block.setAttribute("data-sig-role", key);
@@ -1439,6 +1533,7 @@ function openImportModal(){
     </div>
     <div class="file-drop" id="impDrop" style="margin-top:10px;">Drop a .html or .json file here</div>
     <div class="checkbox-group" style="margin-top:12px;">
+      <div class="checkrow"><input type="checkbox" id="impStyle" checked><label for="impStyle">Grab brand colors &amp; fonts into the Style menu</label></div>
       <div class="checkrow"><input type="checkbox" id="impNormalize"><label for="impNormalize">Also rewrite to clean standard structure <span style="color:var(--faint)">(changes the layout — leave off to keep the original design exactly)</span></label></div>
       <div class="checkrow"><input type="checkbox" id="impReview" checked><label for="impReview">Open connection review after import</label></div>
     </div>
@@ -1476,6 +1571,7 @@ function doImportHtml(html){
   html=extractBody(html);
   const doNorm=$("#impNormalize") && $("#impNormalize").checked;
   const doReview=$("#impReview") && $("#impReview").checked;
+  const doStyle=$("#impStyle") ? $("#impStyle").checked : true;
   // recognize roles heuristically on a detached tree
   const tmp=document.createElement("div"); tmp.innerHTML=sanitizeImported(html);
   markBlocks(tmp);
@@ -1484,6 +1580,8 @@ function doImportHtml(html){
   // into the imported design. We only keep values we actually harvest.
   blankProfile();
   state.__importedSocials = state.__importedSocials || [];
+  // extract brand colors + fonts into the Style menu (before we rebuild)
+  if(doStyle){ extractStyleFromDom(tmp); }
   if(doNorm){
     // normalize rebuilds a clean layout from recognized roles only
     state.html = normalizeStructure(tmp);
@@ -1493,8 +1591,43 @@ function doImportHtml(html){
   }
   harvestProfileFromDom();
   snapshot(); renderAll(); persist(); closeModal();
-  toast("Imported"+(doNorm?" & normalized":" (original layout kept)"));
+  toast("Imported"+(doNorm?" & normalized":" (original layout kept)")+(doStyle?" · brand style grabbed":""));
   if(doReview) openReviewModal();
+}
+
+/* pull dominant colors + primary font from imported inline styles into Style menu */
+function extractStyleFromDom(root){
+  const colorCount={}, fontCount={}; let linkColor=null, nameColor=null;
+  const bump=(map,v)=>{ if(!v) return; v=v.trim().toLowerCase(); map[v]=(map[v]||0)+1; };
+  const normColor=(c)=>{
+    if(!c) return null; c=c.trim();
+    if(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(c)) return c.toLowerCase();
+    const m=c.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if(m){ return "#"+[m[1],m[2],m[3]].map(x=>(+x).toString(16).padStart(2,"0")).join(""); }
+    return null;
+  };
+  $$("*",root).forEach(n=>{
+    const st=n.getAttribute && n.getAttribute("style")||"";
+    const col=normColor((st.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i)||[])[1]);
+    const ff=(st.match(/font-family\s*:\s*([^;]+)/i)||[])[1];
+    if(col && col!=="#ffffff" && col!=="#fff") bump(colorCount,col);
+    if(ff) bump(fontCount, ff.trim());
+    const role=n.getAttribute && n.getAttribute("data-sig-role");
+    if(role==="name" && col) nameColor=col;
+    if((n.tagName==="A") && col && !isSocialHref(n.getAttribute("href"))) linkColor=linkColor||col;
+  });
+  const topColor=Object.keys(colorCount).sort((a,b)=>colorCount[b]-colorCount[a])[0];
+  const topFont=Object.keys(fontCount).sort((a,b)=>fontCount[b]-fontCount[a])[0];
+  if(topColor) state.style.textColor=topColor;
+  if(nameColor) state.style.nameColor=nameColor;
+  if(linkColor){ state.style.linkColor=linkColor; state.style.accentColor=linkColor; state.style.buttonBg=linkColor; }
+  if(topFont){ state.style.fontFamily=topFont.replace(/["']/g,"'"); 
+    // register the imported font as a selectable custom token so it stays available
+    state.style.customTokens = state.style.customTokens||[];
+    if(!state.style.customTokens.some(t=>t.kind==="font" && t.value.toLowerCase()===topFont.toLowerCase())){
+      state.style.customTokens.push({id:uid("tok"),name:"Imported font",kind:"font",value:topFont});
+    }
+  }
 }
 
 /* wipe profile text/image values so the imported design shows its OWN content,
@@ -1515,80 +1648,120 @@ function sanitizeImported(html){
   return d.innerHTML.trim();
 }
 
+const SOCIAL_HOSTS={linkedin:/linkedin\.com/i,twitter:/(twitter\.com|\/\/x\.com|\bx\.com)/i,github:/github\.com/i,instagram:/instagram\.com/i,facebook:/facebook\.com/i,youtube:/(youtube\.com|youtu\.be)/i};
+function isSocialHref(h){ return Object.values(SOCIAL_HOSTS).some(rx=>rx.test(h||"")); }
+
 /* Mark atomic, editable blocks WITHOUT creating giant catch-all blocks.
-   We mark images and anchors always, plus leaf-ish text containers (a node
-   that holds text but has no child element that itself holds much text). */
+   Rule: a node is a "text leaf" only if it holds text directly and does NOT
+   contain another element that itself holds visible text. Big containers
+   (a <td> wrapping several <div> lines) are therefore NEVER marked. */
 function markBlocks(root){
   // images and links are always atomic blocks
   Array.from(root.querySelectorAll("img,a")).forEach(n=>{ if(!n.hasAttribute("data-sig-block")) n.setAttribute("data-sig-block",""); });
-  // text leaves: elements whose direct text content is non-trivial and which
-  // do NOT contain another block-level text element (avoids wrapping everything)
-  const textTags=["p","span","div","td","h1","h2","h3","h4","b","strong","em","font"];
+  const textTags=["p","span","div","td","h1","h2","h3","h4","h5","b","strong","em","font","li"];
   Array.from(root.querySelectorAll(textTags.join(","))).forEach(n=>{
     if(n.hasAttribute("data-sig-block")) return;
-    // skip if it contains block children that will themselves be text leaves
-    const hasBlockTextChild = Array.from(n.children).some(c=>{
-      const t=c.tagName.toLowerCase();
-      return ["p","div","td","h1","h2","h3","h4","table","tr"].includes(t) && (c.textContent||"").trim().length>0;
+    if(n.closest("a")) return; // text inside a link belongs to the link
+    // does any descendant ELEMENT carry its own visible text? then n is a container
+    const hasTextyChild = Array.from(n.children).some(c=>{
+      if(c.tagName==="IMG") return false;
+      if(["b","strong","em","i","u","span","font","a","br"].includes(c.tagName.toLowerCase())) return false; // inline formatting = still a leaf
+      return (c.textContent||"").trim().length>0;
     });
-    const ownText=directText(n);
-    if(!hasBlockTextChild && ownText.length>0){ n.setAttribute("data-sig-block",""); }
+    if(!hasTextyChild && directText(n).length>0){ n.setAttribute("data-sig-block",""); }
   });
 }
-/* text that belongs directly to node (not deep descendants' block text) */
+/* visible text that belongs directly to node (inline children included) */
 function directText(n){
+  if(!n || !n.childNodes) return "";
   let s="";
-  n.childNodes.forEach(c=>{ if(c.nodeType===3) s+=c.textContent; else if(c.nodeType===1 && ["b","strong","em","span","a","font","i","u"].includes(c.tagName.toLowerCase())) s+=c.textContent; });
-  return s.trim();
+  n.childNodes.forEach(c=>{
+    if(c.nodeType===3) s+=c.textContent;
+    else if(c.nodeType===1 && ["b","strong","em","span","a","font","i","u","br"].includes(c.tagName.toLowerCase())) s+=c.textContent;
+  });
+  return s.replace(/\s+/g," ").trim();
+}
+/* the tightest marked block that actually contains this node */
+function tightestBlock(node){
+  if(!node) return null;
+  if(node.nodeType===3) node=node.parentElement;
+  // prefer the node itself if it's a marked leaf
+  if(node.hasAttribute && node.hasAttribute("data-sig-block")) return node;
+  const inner = node.querySelector && node.querySelector("[data-sig-block]");
+  // if the clicked node wraps exactly one leaf, use that leaf
+  if(inner && node.querySelectorAll("[data-sig-block]").length===1) return inner;
+  return (node.closest && node.closest("[data-sig-block]")) || node;
 }
 
-/* heuristic recognizer — tags TIGHT elements, never a huge container */
+/* heuristic recognizer — tags TIGHT leaves, never a huge container */
 function recognizeRoles(root){
-  const socialHosts={linkedin:/linkedin\.com/i,twitter:/(twitter\.com|\/\/x\.com|\bx\.com)/i,github:/github\.com/i,instagram:/instagram\.com/i,facebook:/facebook\.com/i,youtube:/(youtube\.com|youtu\.be)/i};
+  // ---- images ----
+  const allImgs=$$("img",root);
+  const socialImgs=allImgs.filter(im=>{ const s=(im.getAttribute("src")||"")+(im.getAttribute("alt")||""); return isSocialHref(im.closest("a")?im.closest("a").getAttribute("href"):"") || /linkedin|twitter|github|instagram|facebook|youtube/i.test(s); });
+  const contentImgs=allImgs.filter(im=>!socialImgs.includes(im));
+  // signature: an image whose src/alt mentions "sign", OR a wide short image near the top before the photo
+  const sigImg=contentImgs.find(im=>/signature|signoff|sign-/i.test((im.getAttribute("src")||"")+(im.getAttribute("alt")||"")));
+  if(sigImg) sigImg.setAttribute("data-sig-role","signature");
+  const remaining=contentImgs.filter(im=>im!==sigImg);
+  if(remaining[0]) remaining[0].setAttribute("data-sig-role","photo");
+  if(remaining.length>1){ const last=remaining[remaining.length-1]; const w=parseInt(last.getAttribute("width"))||0; last.setAttribute("data-sig-role", w>280?"banner":"logo"); }
 
-  // ---- images: first = photo, large/last = logo or banner ----
-  const imgs=$$("img",root).filter(im=>{ const s=(im.getAttribute("src")||""); return s && !/linkedin|twitter|github|instagram|facebook|youtube|\.svg/i.test(s); });
-  if(imgs[0]) imgs[0].setAttribute("data-sig-role","photo");
-  if(imgs.length>1){ const last=imgs[imgs.length-1]; const w=parseInt(last.getAttribute("width"))||0; last.setAttribute("data-sig-role", w>240?"banner":"logo"); }
-
-  // ---- social links: collect, don't tag each line as a contact ----
+  // ---- social links: collect for the sidebar ----
   const found=[];
-  $$("a",root).forEach(a=>{ const h=a.getAttribute("href")||""; for(const k in socialHosts){ if(socialHosts[k].test(h)){ found.push({type:k,url:h}); break; } } });
+  $$("a",root).forEach(a=>{ const h=a.getAttribute("href")||""; for(const k in SOCIAL_HOSTS){ if(SOCIAL_HOSTS[k].test(h)){ found.push({type:k,url:h}); break; } } });
   state.__importedSocials = found;
 
-  // ---- email / phone / website: tag the tightest element around the anchor ----
+  // ---- email / phone / website: tag the tight block around each anchor ----
   $$("a",root).forEach(a=>{
     const h=a.getAttribute("href")||"";
-    const holder = a.hasAttribute("data-sig-block") ? a : (a.closest("[data-sig-block]")||a);
-    if(/^mailto:/i.test(h)) holder.setAttribute("data-sig-role","email");
-    else if(/^tel:/i.test(h)) holder.setAttribute("data-sig-role","phone");
-    else if(/^https?:/i.test(h) && !Object.values(socialHosts).some(rx=>rx.test(h)) && !holder.getAttribute("data-sig-role")) holder.setAttribute("data-sig-role","website");
+    if(isSocialHref(h)) return;
+    const holder = a.hasAttribute("data-sig-block") ? a : (tightestBlock(a) || a);
+    if(/^mailto:/i.test(h)){ if(!holder.getAttribute("data-sig-role")) holder.setAttribute("data-sig-role","email"); }
+    else if(/^tel:/i.test(h)){ if(!holder.getAttribute("data-sig-role")) holder.setAttribute("data-sig-role","phone"); }
+    else if(/^https?:/i.test(h) && !holder.getAttribute("data-sig-role")) holder.setAttribute("data-sig-role","website");
   });
 
-  // ---- name: the FIRST heading/bold text leaf (tight), not its container ----
-  const nameEl = pickNameElement(root);
+  // ---- text-pattern pass over leaves: name, title, company, phone, email, address ----
+  const leaves=$$("[data-sig-block]",root).filter(n=>n.tagName!=="IMG" && n.tagName!=="A" && directText(n));
+  // name first (tight bold/heading or first leaf)
+  const nameEl=pickNameElement(root, leaves);
   if(nameEl && !nameEl.getAttribute("data-sig-role")) nameEl.setAttribute("data-sig-role","name");
 
-  // ---- phone / email by text pattern when not in an anchor ----
-  const marked=$$("[data-sig-block]",root);
-  marked.forEach(n=>{
+  const nameIdx = leaves.indexOf(nameEl);
+  leaves.forEach((n,i)=>{
     if(n.getAttribute("data-sig-role")) return;
     const t=directText(n); if(!t) return;
-    if(n===nameEl) return;
-    if(/^[\s(+]*\d[\d\s()\-./]{6,}$/.test(t)) n.setAttribute("data-sig-role","phone");
-    else if(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(t) && t.length<60) n.setAttribute("data-sig-role","email");
+    if(/^[\s(+]*\d[\d\s()\-./]{6,}\d$/.test(t)){ n.setAttribute("data-sig-role","phone"); return; }
+    if(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(t) && t.length<80){ n.setAttribute("data-sig-role","email"); return; }
+    if(/\b(www\.|https?:\/\/)\S+/i.test(t) && t.length<80){ n.setAttribute("data-sig-role","website"); return; }
+    // address heuristics: contains comma + (country/city words) or street tokens
+    if(/\b(st|street|ave|avenue|road|rd|suite|ste|floor|poland|usa|uk|city|,)\b/i.test(t) && t.length<80 && /[,\d]/.test(t)){ /* candidate — set later if unclaimed */ }
   });
+
+  // title/company: the 1–2 leaves immediately AFTER the name that are plain text
+  if(nameIdx>=0){
+    let assigned=0;
+    for(let i=nameIdx+1;i<leaves.length && assigned<2;i++){
+      const n=leaves[i]; if(n.getAttribute("data-sig-role")) continue;
+      const t=directText(n);
+      if(!t || /@|https?:|www\.|^\+?[\d\s()\-./]{6,}$/i.test(t)) break; // stop at contact info
+      n.setAttribute("data-sig-role", assigned===0?"title":"company");
+      assigned++;
+    }
+  }
+
+  // address: last unclaimed plain leaf that looks location-ish
+  const addrCand=leaves.slice().reverse().find(n=>!n.getAttribute("data-sig-role") && /[A-Za-z].*,.*[A-Za-z]|\b(poland|usa|uk|street|st\.|ave|road)\b/i.test(directText(n)) && directText(n).length<80);
+  if(addrCand) addrCand.setAttribute("data-sig-role","address");
 }
 
-/* choose a tight element that looks like the person's name:
-   prefer the first h1-h3/b/strong leaf; fall back to the first short text leaf */
-function pickNameElement(root){
-  const candidates = $$("h1,h2,h3,b,strong",root)
-    .map(e=> e.hasAttribute("data-sig-block") ? e : (e.closest("[data-sig-block]")||e))
+/* choose a tight element that looks like the person's name */
+function pickNameElement(root, leaves){
+  const bold=$$("h1,h2,h3,b,strong",root)
+    .map(e=> e.hasAttribute("data-sig-block") ? e : (tightestBlock(e)||e))
     .filter(e=>{ const t=directText(e); return t && t.length<=60 && !/@|https?:|\+?\d{6,}/.test(t); });
-  if(candidates[0]) return candidates[0];
-  // fallback: first marked text leaf
-  const leaves=$$("[data-sig-block]",root).filter(n=>n.tagName!=="IMG" && n.tagName!=="A" && directText(n));
+  if(bold[0]) return bold[0];
+  leaves=leaves||$$("[data-sig-block]",root).filter(n=>n.tagName!=="IMG" && n.tagName!=="A" && directText(n));
   return leaves[0]||null;
 }
 
@@ -1610,12 +1783,18 @@ function harvestProfileFromDom(){
    ================================================================ */
 function normalizeStructure(root){
   // Rebuild a clean standard layout using ONLY recognized values (no defaults).
-  const get=(key,attr)=>{ const n=root.querySelector(`[data-sig-role="${key}"]`); if(!n) return ""; if(attr==="src"){ const img=n.tagName==="IMG"?n:n.querySelector("img"); return img?img.getAttribute("src"):""; } return directText(n)||((n.textContent||"").trim()); };
+  const get=(key,attr)=>{ const n=root.querySelector(`[data-sig-role="${key}"]`); if(!n) return ""; if(attr==="src"){ const img=n.tagName==="IMG"?n:n.querySelector("img"); return img?(img.getAttribute("src")||""):""; } return directText(n)||((n.textContent||"").trim()); };
   // harvest recognized values into a fresh profile (don't keep defaults)
   blankProfile();
   state.profile.photo=get("photo","src");
   state.profile.logo=get("logo","src");
+  state.profile.signature=get("signature","src");
   state.profile.banner=get("banner","src");
+  // Fallback: if nothing was tagged "photo" but there ARE content images, use the first.
+  if(!state.profile.photo){
+    const anyImg=$$("img",root).find(im=>{ const h=im.closest("a")?im.closest("a").getAttribute("href"):""; return !isSocialHref(h) && (im.getAttribute("src")||"") && !/\.svg($|\?)/i.test(im.getAttribute("src")||""); });
+    if(anyImg) state.profile.photo=anyImg.getAttribute("src")||"";
+  }
   ["name","title","company","tagline","phone","mobile","email","website","address","disclaimer"].forEach(k=>{ state.profile[k]=get(k); });
   // harvested socials (set earlier by recognizeRoles)
   if(state.__importedSocials && state.__importedSocials.length){
@@ -1633,60 +1812,130 @@ function normalizeInPlace(){
 /* ================================================================
    CONNECTION REVIEW modal (side-by-side)
    ================================================================ */
+let reviewFilter="all"; let reviewConnectKey=null;
 function openReviewModal(){
   const defs=allFieldDefs();
   setModal("Connection review", `
-    <p class="hint">Green = connected. Hover a field or an element to see its match light up. Click “Connect” then click the matching element in the preview to wire an unconnected field.</p>
-    <div class="review-grid" style="margin-top:12px;">
+    <p class="hint">Hover a field <b>or</b> an element in the design to see its match outlined. To wire an unconnected field: click <b>Connect</b>, then click the matching element in the design — <b>or drag the element onto the field</b>.</p>
+    <div class="rv-filter" id="rvFilter">
+      <span class="rv-chip active" data-f="all">All</span>
+      <span class="rv-chip" data-f="connected">● Connected</span>
+      <span class="rv-chip" data-f="unlinked">○ Not connected</span>
+    </div>
+    <div class="review-grid" style="margin-top:10px;">
       <div class="review-col"><h4>Fields</h4><div class="review-fields" id="rvFields"></div></div>
-      <div class="review-col"><h4>Design</h4><div class="review-preview" id="rvPreview"></div></div>
+      <div class="review-col"><h4>Design</h4><div class="review-preview" id="rvPreview"></div><div class="rv-boxlabel" id="rvBoxLabel"></div></div>
     </div>
   `, [ {label:"Normalize now", cls:"ghost", act:()=>{ normalizeInPlace(); closeModal(); }}, {label:"Done", cls:"", act:closeModal} ]);
   const prev=$("#rvPreview"); prev.innerHTML=cleanExportButKeepRoles();
-  const fields=$("#rvFields");
-  defs.forEach(d=>{
+  renderReviewFields();
+  // filter chips
+  $$("#rvFilter .rv-chip").forEach(c=>c.addEventListener("click",()=>{ reviewFilter=c.getAttribute("data-f"); $$("#rvFilter .rv-chip").forEach(x=>x.classList.toggle("active",x===c)); renderReviewFields(); }));
+  // DESIGN -> FIELD hover: outline hovered element + light up its field, with a label box
+  prev.addEventListener("mousemove", onReviewPreviewHover);
+  prev.addEventListener("mouseleave", clearReviewHover);
+}
+function renderReviewFields(){
+  const prev=$("#rvPreview"); const fields=$("#rvFields"); if(!fields) return;
+  fields.innerHTML="";
+  allFieldDefs().forEach(d=>{
     const target=prev.querySelector(`[data-sig-role="${d.key}"]`);
     const bound=!!target;
-    const row=el("div",{class:"cfield"+(bound?" connected":"")});
+    if(reviewFilter==="connected" && !bound) return;
+    if(reviewFilter==="unlinked" && bound) return;
+    const row=el("div",{class:"cfield compact"+(bound?" connected":""), "data-role":d.key});
     const head=el("div",{class:"chead"});
     head.appendChild(el("span",{class:"status"}));
     head.appendChild(el("span",{class:"clabel"}, d.label));
-    head.appendChild(el("span",{class:"cbind"+(bound?"":" unbound")}, bound?"● linked":"○ not linked"));
+    head.appendChild(el("span",{class:"cbind"+(bound?"":" unbound")}, bound?"linked":"not linked"));
+    const btn=el("button",{class:"btn ghost small", style:"flex:0 0 auto;"}, bound?"Re-connect":"Connect");
+    btn.addEventListener("click",()=>startReviewConnect(d.key, btn));
+    head.appendChild(btn);
     row.appendChild(head);
-    const btn=el("button",{class:"btn ghost small"}, bound?"Re-connect":"Connect");
-    btn.addEventListener("click",()=>startReviewConnect(d.key, prev, btn));
-    row.appendChild(btn);
-    row.addEventListener("mouseenter",()=>{ const t=prev.querySelector(`[data-sig-role="${d.key}"]`); if(t)t.classList.add("rv-mark"); });
-    row.addEventListener("mouseleave",()=>{ const t=prev.querySelector(`[data-sig-role="${d.key}"]`); if(t)t.classList.remove("rv-mark"); });
+    // FIELD -> DESIGN hover
+    row.addEventListener("mouseenter",()=>{ const t=prev.querySelector(`[data-sig-role="${d.key}"]`); if(t){ t.classList.add("rv-mark"); showReviewBox(t, d.label, true);} });
+    row.addEventListener("mouseleave",()=>{ const t=prev.querySelector(`[data-sig-role="${d.key}"]`); if(t)t.classList.remove("rv-mark"); hideReviewBox(); });
+    // DRAG a design element onto this field to connect
+    row.addEventListener("dragover",ev=>{ ev.preventDefault(); row.classList.add("droptarget"); });
+    row.addEventListener("dragleave",()=>row.classList.remove("droptarget"));
+    row.addEventListener("drop",ev=>{ ev.preventDefault(); row.classList.remove("droptarget"); if(reviewDragEl){ assignRoleInPreview(d.key, reviewDragEl); } });
     fields.appendChild(row);
   });
+  // make design elements draggable for drag-to-connect
+  enableReviewDragSources();
 }
+
+let reviewDragEl=null;
+function enableReviewDragSources(){
+  const prev=$("#rvPreview"); if(!prev) return;
+  $$("[data-sig-block], img, a", prev).forEach(n=>{
+    n.setAttribute("draggable","true");
+    n.ondragstart=(ev)=>{ reviewDragEl=tightestBlock(n); try{ev.dataTransfer.setData("text/plain","el");}catch(e){} };
+    n.ondragend=()=>{ reviewDragEl=null; };
+  });
+}
+
+function onReviewPreviewHover(ev){
+  const prev=$("#rvPreview");
+  const el2=tightestBlock(ev.target);
+  if(!el2 || el2===prev){ clearReviewHover(); return; }
+  $$(".rv-hover",prev).forEach(n=>n.classList.remove("rv-hover"));
+  el2.classList.add("rv-hover");
+  const role=el2.getAttribute && el2.getAttribute("data-sig-role");
+  const def=role && (ROLE_BY_KEY[role] || (state.customFields||[]).find(f=>f.key===role));
+  const label = def ? ("● "+def.label) : "○ not connected";
+  showReviewBox(el2, label, !!def);
+  // light up the matching left field
+  $$("#rvFields .cfield").forEach(f=>f.classList.toggle("highlight", role && f.getAttribute("data-role")===role));
+}
+function clearReviewHover(){
+  const prev=$("#rvPreview"); if(prev) $$(".rv-hover",prev).forEach(n=>n.classList.remove("rv-hover"));
+  $$("#rvFields .cfield").forEach(f=>f.classList.remove("highlight"));
+  hideReviewBox();
+}
+function showReviewBox(target, label, ok){
+  const box=$("#rvBoxLabel"); const prev=$("#rvPreview"); if(!box||!prev||!target) return;
+  const pr=prev.getBoundingClientRect(); const tr=target.getBoundingClientRect();
+  box.textContent=label; box.className="rv-boxlabel show "+(ok?"ok":"warn");
+  box.style.left=(tr.left-pr.left+prev.scrollLeft)+"px";
+  box.style.top=Math.max(0,(tr.top-pr.top+prev.scrollTop-20))+"px";
+}
+function hideReviewBox(){ const box=$("#rvBoxLabel"); if(box) box.className="rv-boxlabel"; }
+
 function cleanExportButKeepRoles(){ const t=$("#paper").cloneNode(true); stripEditorChrome(t); return t.innerHTML; }
-let reviewConnect=null;
-function startReviewConnect(key, prev, btn){
-  reviewConnect=key; btn.textContent="Click an element…";
+
+function startReviewConnect(key, btn){
+  reviewConnectKey=key; if(btn) btn.textContent="Click an element…";
+  const prev=$("#rvPreview");
   const handler=(ev)=>{
-    const b=ev.target.closest("[data-sig-role],img,a,td,div,table"); if(!b) return;
+    const b=tightestBlock(ev.target); if(!b || b===prev) return;
     ev.preventDefault(); ev.stopPropagation();
-    // set role in the real paper by matching index/outerHTML is tricky; simplest: set on preview then rebuild
-    prev.querySelectorAll(`[data-sig-role="${key}"]`).forEach(n=>n.removeAttribute("data-sig-role"));
-    b.setAttribute("data-sig-role",key);
-    state.html=prev.innerHTML; // adopt preview edits
-    harvestProfileFromDom(); renderAll(); persist();
+    assignRoleInPreview(key, b);
     prev.removeEventListener("click",handler,true);
-    openReviewModal(); // refresh
-    toast("Connected "+key);
   };
   prev.addEventListener("click",handler,true);
 }
+/* set a role on a preview element, adopt the edits, refresh everything */
+function assignRoleInPreview(key, elTight){
+  const prev=$("#rvPreview");
+  prev.querySelectorAll(`[data-sig-role="${key}"]`).forEach(n=>{ if(n!==elTight) n.removeAttribute("data-sig-role"); });
+  elTight.setAttribute("data-sig-role",key);
+  state.html=prev.innerHTML;
+  harvestProfileFromDom(); renderAll(); persist();
+  reviewConnectKey=null;
+  openReviewModal();
+  const def=ROLE_BY_KEY[key]||(state.customFields||[]).find(f=>f.key===key);
+  toast("Connected "+(def?def.label:key));
+}
 
-/* in-canvas connect mode (from banner) */
+/* in-canvas connect mode (from banner / field link button) */
 const connectMode={active:false,key:null};
 function completeConnect(block){
   if(!connectMode.active) return;
-  connectRoleToBlock(connectMode.key, block);
+  const key=connectMode.key;
   connectMode.active=false; connectMode.key=null;
   $("#connectBanner").classList.remove("show");
+  connectRoleToBlock(key, block);
 }
 
 /* ================================================================
@@ -1790,6 +2039,11 @@ function bindUI(){
   $("#connectCancel").addEventListener("click",()=>{ connectMode.active=false; $("#connectBanner").classList.remove("show"); });
   // click empty paper deselects
   $("#stage").addEventListener("click",e=>{ if(e.target.id==="stage"||e.target.id==="paper"){ selectBlock(null); openInspectorFor(null); } });
+  // canvas hover -> bounding box + field highlight
+  $("#paper").addEventListener("mousemove", onCanvasHover);
+  $("#paper").addEventListener("mouseleave", ()=>{ hideCanvasBox(); $$("#fieldsHost .cfield.highlight").forEach(f=>f.classList.remove("highlight")); });
+  // left-panel field filter chips
+  $$("#fieldFilter .rv-chip").forEach(c=>c.addEventListener("click",()=>{ fieldFilter=c.getAttribute("data-f"); $$("#fieldFilter .rv-chip").forEach(x=>x.classList.toggle("active",x===c)); renderFields(); }));
   // keyboard
   document.addEventListener("keydown",e=>{
     const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) || document.activeElement.isContentEditable;
