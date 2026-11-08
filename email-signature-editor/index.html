@@ -3,745 +3,2739 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Email Signature Editor</title>
+<title>Email Signature Builder</title>
 <style>
   :root {
-    --bg: #0f1221;
-    --panel: #171a2b;
-    --panel-2: #1f2338;
-    --border: #2b3050;
-    --text: #e7e9f3;
+    --bg: #0e1120;
+    --panel: #161a2c;
+    --panel-2: #1e2339;
+    --panel-3: #262c47;
+    --border: #2c3254;
+    --border-2: #3a4169;
+    --text: #e8eaf5;
     --muted: #9aa0bd;
+    --faint: #6b7196;
     --accent: #6c8cff;
     --accent-2: #4f6fe0;
     --good: #35c08a;
+    --good-dim: #1e6b4d;
+    --warn: #e6b34d;
     --danger: #e0635a;
     --radius: 10px;
-    --shadow: 0 6px 24px rgba(0,0,0,.35);
+    --shadow: 0 8px 30px rgba(0,0,0,.4);
+    /* syntax colors */
+    --syn-tag: #7aa2ff;
+    --syn-attr: #c792ea;
+    --syn-str: #c3e88d;
+    --syn-com: #5c6283;
+    --syn-txt: #d7dbf0;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
+  html, body { height: 100%; margin: 0; }
   body {
-    margin: 0;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
+    background: var(--bg); color: var(--text); overflow: hidden;
+    font-size: 13px;
   }
+  button { font-family: inherit; }
+
+  /* ---------- Header ---------- */
   header {
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 16px; padding: 14px 20px;
-    background: linear-gradient(180deg, #1a1e33, #141728);
-    border-bottom: 1px solid var(--border);
-    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; gap: 14px; height: 52px; padding: 0 16px;
+    background: linear-gradient(180deg, #1a1f36, #13172a);
+    border-bottom: 1px solid var(--border); position: relative; z-index: 30;
   }
-  header h1 { font-size: 16px; margin: 0; letter-spacing: .3px; font-weight: 650; }
-  header .sub { color: var(--muted); font-size: 12px; margin-left: 10px; }
-  .layout {
-    display: grid;
-    grid-template-columns: 420px 1fr;
-    min-height: calc(100vh - 56px);
-  }
-  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+  header h1 { font-size: 15px; margin: 0; font-weight: 650; letter-spacing: .2px; white-space: nowrap; }
+  header .brand { font-size: 17px; }
+  .spacer { flex: 1; }
+  .hgroup { display: flex; gap: 6px; align-items: center; }
+  .hsep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
 
-  .editor { border-right: 1px solid var(--border); padding: 18px; overflow-y: auto; }
-  .preview-wrap { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
-
-  .tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
-  .tab {
-    background: var(--panel); border: 1px solid var(--border); color: var(--muted);
-    padding: 7px 12px; border-radius: 999px; font-size: 12.5px; cursor: pointer; user-select: none;
-  }
-  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
-
-  .section { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; }
-  .section h2 { margin: 0 0 12px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; font-weight: 650; }
-
-  .field { margin-bottom: 11px; }
-  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
-  .row { display: flex; gap: 10px; }
-  .row > .field { flex: 1; }
-  input[type="text"], input[type="url"], input[type="email"], input[type="number"], select, textarea {
-    width: 100%; background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
-    border-radius: 8px; padding: 9px 10px; font-size: 13px; font-family: inherit;
-  }
-  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,140,255,.2); }
-  input[type="color"] { width: 42px; height: 36px; padding: 2px; border: 1px solid var(--border); background: var(--panel-2); border-radius: 8px; cursor: pointer; }
-  .color-row { display: flex; align-items: center; gap: 8px; }
-  .color-row input[type="text"] { flex: 1; }
-  textarea { min-height: 120px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.5; }
-
+  /* ---------- Buttons ---------- */
   .btn {
     background: var(--accent); color: #fff; border: none; border-radius: 8px;
-    padding: 9px 14px; font-size: 13px; cursor: pointer; font-weight: 600;
+    padding: 8px 13px; font-size: 12.5px; cursor: pointer; font-weight: 600; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px;
   }
   .btn:hover { background: var(--accent-2); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
   .btn.secondary { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); font-weight: 500; }
-  .btn.secondary:hover { border-color: var(--accent); }
-  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  .btn.secondary:hover { border-color: var(--accent); background: var(--panel-3); }
+  .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--muted); font-weight: 500; }
+  .btn.ghost:hover { border-color: var(--accent); color: var(--text); }
   .btn.small { padding: 6px 10px; font-size: 12px; }
-  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn.icon { padding: 7px 9px; }
+  .btn.good { background: var(--good); color: #042a1c; }
 
-  .links-list { display: flex; flex-direction: column; gap: 8px; }
-  .link-item { display: flex; gap: 8px; align-items: center; }
-  .link-item select { flex: 0 0 120px; }
-  .link-item input { flex: 1; }
-  .link-item .remove { flex: 0 0 auto; background: transparent; border: 1px solid var(--border); color: var(--danger); border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 16px; }
-
-  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-  .device-toggle { display: flex; gap: 6px; }
-  .pill { font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
-  .pill.active { color: #fff; border-color: var(--accent); background: var(--accent); }
-
-  .preview-frame {
-    background: #ffffff; border-radius: var(--radius); box-shadow: var(--shadow);
-    padding: 28px; overflow: auto; flex: 1; min-height: 240px; transition: max-width .2s ease; width: 100%;
+  /* ---------- Main layout ---------- */
+  .app { display: flex; height: calc(100vh - 52px); }
+  .sidebar {
+    width: 340px; min-width: 220px; max-width: 520px; background: var(--panel); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden; position: relative; z-index: 70; flex: 0 0 auto;
   }
-  .preview-frame.mobile { max-width: 380px; }
+  .center { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 320px; }
+  .rawpanel {
+    width: 440px; min-width: 0; max-width: 820px; background: #0b0e1a; border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow: hidden; transition: width .18s ease; position: relative; z-index: 70; flex: 0 0 auto;
+  }
+  .rawpanel.collapsed { width: 0; min-width: 0; border-left: none; }
 
-  .code-box { position: relative; }
-  .code-box textarea { min-height: 220px; }
-  .hint { font-size: 11.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  /* ---------- Sidebar tabs ---------- */
+  .side-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--panel-2); }
+  .side-tab {
+    flex: 1; text-align: center; padding: 10px 4px; font-size: 11.5px; color: var(--muted);
+    cursor: pointer; border-bottom: 2px solid transparent; user-select: none; font-weight: 600;
+  }
+  .side-tab:hover { color: var(--text); }
+  .side-tab.active { color: #fff; border-bottom-color: var(--accent); background: var(--panel); }
+  .side-body { flex: 1; overflow-y: auto; padding: 14px; }
+  .side-pane { display: none; }
+  .side-pane.active { display: block; }
+
+  /* ---------- Sections / fields ---------- */
+  .section { background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; margin-bottom: 12px; }
+  .section > h3 {
+    margin: 0 0 10px; font-size: 11px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .6px; font-weight: 700; display: flex; align-items: center; gap: 6px;
+  }
+  .field { margin-bottom: 10px; }
+  .field:last-child { margin-bottom: 0; }
+  .field > label { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 5px; }
+  .row2 { display: flex; gap: 8px; }
+  .row2 > * { flex: 1; min-width: 0; }
+  input[type=text], input[type=url], input[type=email], input[type=number], select, textarea {
+    width: 100%; background: var(--panel-3); border: 1px solid var(--border); color: var(--text);
+    border-radius: 7px; padding: 8px 9px; font-size: 12.5px; font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,140,255,.18); }
+  input::placeholder, textarea::placeholder { color: var(--faint); }
+  select { cursor: pointer; }
+
+  /* ---------- Connectable field (left profile rows) ---------- */
+  .cfield { position: relative; border: 1px solid var(--border); border-radius: 8px; padding: 9px; margin-bottom: 9px; background: var(--panel-2); transition: border-color .12s, box-shadow .12s; }
+  .cfield.droptarget { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,140,255,.3); }
+  .cfield.highlight { border-color: var(--good); box-shadow: 0 0 0 2px rgba(53,192,138,.35); }
+  .cfield .chead { display: flex; align-items: center; gap: 7px; margin-bottom: 7px; }
+  .cfield .status { width: 10px; height: 10px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; }
+  .cfield.connected .status { background: var(--good); box-shadow: 0 0 6px rgba(53,192,138,.6); }
+  .cfield .clabel { font-size: 12px; font-weight: 600; color: var(--text); flex: 1; }
+  .cfield .ctype { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: .4px; }
+  .cfield .cbind { font-size: 10px; color: var(--good); }
+  .cfield .cbind.unbound { color: var(--warn); }
+  .cfield .unlink { background: transparent; border: none; color: var(--faint); cursor: pointer; font-size: 13px; padding: 2px 4px; }
+  .cfield .unlink:hover { color: var(--danger); }
+
+  /* ---------- Palette (add elements) ---------- */
+  .palette { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pal-item {
+    background: var(--panel-3); border: 1px solid var(--border); border-radius: 8px; padding: 10px 8px;
+    text-align: center; cursor: grab; font-size: 11.5px; color: var(--text); user-select: none;
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+  }
+  .pal-item:hover { border-color: var(--accent); background: var(--panel-2); }
+  .pal-item:active { cursor: grabbing; }
+  .pal-item .ic { font-size: 18px; }
+
+  /* ---------- Color / style menu ---------- */
+  .color-row { display: flex; align-items: center; gap: 8px; }
+  .swatch { width: 34px; height: 30px; border-radius: 7px; border: 1px solid var(--border-2); cursor: pointer; flex: 0 0 auto; padding: 0; }
+  .color-row input[type=text] { flex: 1; font-family: ui-monospace, monospace; }
+  .eyedrop { background: var(--panel-3); border: 1px solid var(--border); border-radius: 7px; width: 32px; height: 30px; cursor: pointer; color: var(--muted); font-size: 14px; flex: 0 0 auto; }
+  .eyedrop:hover { border-color: var(--accent); color: var(--text); }
+  .checkrow { display: flex; align-items: center; gap: 8px; }
+  .checkrow input { width: auto; }
+  .checkrow label { margin: 0; font-size: 12px; color: var(--text); }
+  .slider-row { display: flex; align-items: center; gap: 10px; }
+  .slider-row input[type=range] { flex: 1; accent-color: var(--accent); }
+  .slider-row .val { font-size: 11px; color: var(--muted); width: 42px; text-align: right; font-family: ui-monospace, monospace; }
+
+  /* ---------- Center toolbar ---------- */
+  .ctoolbar {
+    display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--border);
+    background: var(--panel-2); flex-wrap: wrap;
+  }
+  .pill { font-size: 11.5px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 5px 11px; cursor: pointer; user-select: none; background: var(--panel); }
+  .pill:hover { color: var(--text); }
+  .pill.active { color: #fff; border-color: var(--accent); background: var(--accent); }
+  .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+  .seg .pill { border: none; border-radius: 0; background: transparent; font-size: 14px; padding: 5px 10px; }
+  .seg .pill.active { background: var(--accent); }
+  .zoomctl { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); font-family: ui-monospace, monospace; }
+  .zbtn { background: var(--panel); border: 1px solid var(--border); color: var(--text); width: 22px; height: 22px; border-radius: 6px; cursor: pointer; font-size: 14px; line-height: 1; }
+  .zbtn:hover { border-color: var(--accent); }
+
+  /* ---------- resizers ---------- */
+  .resizer { width: 5px; cursor: col-resize; background: transparent; position: relative; z-index: 20; flex: 0 0 auto; }
+  .resizer:hover, .resizer.active { background: var(--accent); }
+  .resizer::after { content: ""; position: absolute; inset: 0 -3px; }
+
+  /* ---------- Canvas / stage ---------- */
+  .stage {
+    flex: 1; overflow: hidden; position: relative;
+    background: #0c0f1c
+      linear-gradient(rgba(255,255,255,.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.015) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  .stage.panning { cursor: grabbing; }
+  .canvas-viewport {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    display: flex; justify-content: center; align-items: flex-start; padding: 40px;
+    transform-origin: 0 0;
+  }
+  .canvas-shell { transition: width .2s ease, padding .2s ease; }
+
+  /* device: desktop monitor */
+  .canvas-shell.desktop { padding: 0; }
+  .canvas-shell.desktop .paper { width: 640px; }
+
+  /* device: laptop */
+  .canvas-shell.laptop { padding: 16px 16px 0; background: #1b1e2e; border-radius: 14px 14px 0 0; box-shadow: 0 0 0 2px #2a2f45; position: relative; }
+  .canvas-shell.laptop .paper { width: 560px; }
+  .canvas-shell.laptop::after { content: ""; position: absolute; left: 50%; bottom: -14px; transform: translateX(-50%); width: calc(100% + 120px); height: 14px; background: linear-gradient(#2a2f45,#1b1e2e); border-radius: 0 0 12px 12px; box-shadow: 0 6px 16px rgba(0,0,0,.5); }
+
+  /* device: mobile phone frame — content SCALED to fit the screen width */
+  .canvas-shell.mobile {
+    width: 360px; padding: 58px 14px 26px; background: #15182a; border-radius: 44px;
+    box-shadow: 0 0 0 2px #2a2f45, 0 20px 60px rgba(0,0,0,.6); position: relative;
+  }
+  .canvas-shell.mobile::before {
+    content: ""; position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 20px; background: #0c0f1c; border-radius: 12px; z-index: 5;
+  }
+  .canvas-shell.mobile::after {
+    content: ""; position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+    width: 110px; height: 4px; background: #3a4060; border-radius: 3px;
+  }
+  .canvas-shell.mobile .phone-screen {
+    width: 332px; min-height: 520px; background: inherit; border-radius: 26px; overflow: hidden;
+  }
+  /* the signature is placed at its natural desktop width then scaled down to fit */
+  .canvas-shell.mobile .paper { width: 640px; transform-origin: top left; border-radius: 0; min-height: 0; }
+
+  .paper {
+    background: #ffffff; color: #111; border-radius: 6px; padding: 28px; min-height: 260px;
+    box-shadow: var(--shadow); transition: background .15s; position: relative;
+  }
+  /* dark-bg preview: paint the paper AND neutralize ANY white fills (tables, tds,
+     wrappers) that the imported design carries, so nothing stays white */
+  .paper.darkbg { background: #14141c !important; color: #e8e8ef; }
+  .paper.darkbg table, .paper.darkbg td, .paper.darkbg tr, .paper.darkbg div, .paper.darkbg p, .paper.darkbg span, .paper.darkbg [data-sig-block] { background-color: transparent !important; }
+
+  /* fit/pan helpers */
+  .pan-hint { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); font-size: 10.5px; color: var(--faint); background: rgba(10,13,26,.7); border: 1px solid var(--border); padding: 3px 10px; border-radius: 999px; pointer-events: none; opacity: 0; transition: opacity .2s; }
+  .stage:hover .pan-hint { opacity: 1; }
+
+  /* ---------- Editor block chrome (only in edit mode) — lighter & non-overlapping ---------- */
+  .editing [data-sig-block] { position: relative; outline: 1px dashed transparent; transition: outline-color .1s; }
+  .editing:not(.boxes-all) [data-sig-block]:hover { outline-color: rgba(108,140,255,.45); }
+  /* show-all boxes (works even if edit chrome is off) */
+  .boxes-all [data-sig-block] { outline: 1px solid rgba(108,140,255,.55) !important; }
+  .editing [data-sig-block].selected { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .editing [data-sig-block].connecting { outline: 2px dashed var(--good) !important; }
+  .blocktag {
+    position: absolute; top: -8px; left: 0; background: var(--accent); color: #fff; font-size: 8.5px;
+    padding: 0 5px; height: 14px; line-height: 14px; border-radius: 3px; display: none; z-index: 6; font-weight: 700; letter-spacing: .2px;
+    text-transform: uppercase; pointer-events: none; white-space: nowrap;
+  }
+  .editing [data-sig-block].selected > .blocktag { display: block; }
+  /* show-all labels (works even if edit chrome is off) */
+  .labels-all [data-sig-block] > .blocktag { display: block !important; opacity: .9; }
+  /* toolbar floats ABOVE the block, right-aligned, only on selection; compact */
+  .block-toolbar {
+    position: absolute; top: -13px; right: 0; display: none; gap: 1px; z-index: 9;
+    background: var(--accent); border-radius: 4px; padding: 1px; box-shadow: 0 2px 6px rgba(0,0,0,.4);
+  }
+  .editing [data-sig-block].selected > .block-toolbar { display: flex; }
+  .block-toolbar button {
+    background: transparent; color: #fff; border: none; width: 18px; height: 16px; font-size: 10px;
+    cursor: pointer; border-radius: 3px; display: flex; align-items: center; justify-content: center; line-height: 1;
+  }
+  .block-toolbar button:hover { background: rgba(255,255,255,.22); }
+
+  /* resize handles */
+  .rz-handle { position: absolute; width: 10px; height: 10px; background: #fff; border: 2px solid var(--accent); border-radius: 50%; z-index: 8; display: none; }
+  .editing [data-sig-block].selected > .rz-handle { display: block; }
+  .rz-se { right: -5px; bottom: -5px; cursor: se-resize; }
+  .rz-e  { right: -5px; top: 50%; transform: translateY(-50%); cursor: e-resize; }
+  .rz-s  { bottom: -5px; left: 50%; transform: translateX(-50%); cursor: s-resize; }
+
+  /* drop indicator when reordering */
+  .drop-line { height: 3px; background: var(--accent); border-radius: 2px; margin: 2px 0; box-shadow: 0 0 8px var(--accent); }
+
+  /* icons in the signature must never pick up editor hover/selection backgrounds */
+  .paper img.sig-line-icon, .paper [data-sig-role$="__icon"] { background: transparent !important; outline: none !important; box-shadow: none !important; }
+  .paper [data-sig-role$="__icon"] img { background: transparent !important; }
+
+  /* collapsible section */
+  .collapsible .collapse-head { cursor: pointer; user-select: none; }
+  .collapsible .caret { display: inline-block; transition: transform .15s; font-size: 10px; }
+  .collapsible:not(.collapsed) .caret { transform: rotate(90deg); }
+  .collapsible.collapsed .collapse-body { display: none; }
+
+  /* per-line icon box (content tab + review) */
+  .iconbox { display: flex; align-items: center; gap: 7px; margin-top: 7px; background: var(--panel-3); border: 1px solid var(--border); border-radius: 7px; padding: 6px 7px; }
+  .iconbox .ic-prev { width: 26px; height: 26px; border-radius: 5px; background: var(--panel); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; overflow: hidden; flex: 0 0 auto; }
+  .iconbox .ic-prev img { max-width: 22px; max-height: 22px; display: block; }
+  .iconbox .ic-prev.empty { color: var(--faint); font-size: 13px; }
+  .iconbox select, .iconbox input { font-size: 11.5px; padding: 5px 6px; }
+  .iconbox .ic-url { flex: 1; min-width: 0; }
+  .subrow { display: flex; gap: 6px; margin-top: 6px; align-items: center; }
+  .subrow label { font-size: 10.5px; color: var(--muted); flex: 0 0 auto; }
+
+  /* rich-text toolbar in inspector */
+  .rt-toolbar { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+  .rt-btn { background: var(--panel-3); border: 1px solid var(--border); color: var(--text); border-radius: 6px; min-width: 28px; height: 26px; font-size: 12px; cursor: pointer; padding: 0 6px; }
+  .rt-btn:hover { border-color: var(--accent); }
+  .rt-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* hover bounding box overlay on the canvas (shows role connection) */
+  .canvas-box { position: fixed; display: none; border: 2px solid var(--accent); border-radius: 4px; pointer-events: none; z-index: 60; box-shadow: 0 0 0 2px rgba(108,140,255,.2); }
+  .canvas-box.show { display: block; }
+  .canvas-box.ok { border-color: var(--good); box-shadow: 0 0 0 2px rgba(53,192,138,.2); }
+  .canvas-box.warn { border-color: var(--warn); box-shadow: 0 0 0 2px rgba(230,179,77,.2); }
+  .canvas-box .cb-label { position: absolute; top: -18px; left: -2px; font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 4px 4px 0 0; white-space: nowrap; color: #fff; background: var(--accent); }
+  /* when the box is near the top of the viewport, show the label INSIDE-top instead of above */
+  .canvas-box.label-below .cb-label { top: 2px; border-radius: 0 0 4px 4px; }
+  .canvas-box.ok .cb-label { background: var(--good); color: #042a1c; }
+  .canvas-box.warn .cb-label { background: var(--warn); color: #3a2a04; }
+
+  /* grouped field (text box + paired icon box, closely related) */
+  .cgroup { margin-bottom: 11px; border-left: 2px solid var(--border); padding-left: 6px; }
+  .cgroup .cfield { margin-bottom: 5px; }
+  .cfield.iconsub { background: var(--panel); border-style: dashed; }
+  .cfield.iconsub .clabel { color: var(--muted); font-weight: 500; }
+
+  /* compact field rows */
+  .mini-btn { background: var(--panel-3); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; font-size: 10px; padding: 3px 7px; cursor: pointer; flex: 0 0 auto; }
+  .mini-btn:hover { border-color: var(--accent); color: var(--text); }
+  .mini-btn.connect { color: var(--accent); border-color: var(--accent); }
+  .cfield-input { margin-top: 7px; }
+
+  /* connect-mode banner */
+  .connect-banner {
+    display: none; align-items: center; gap: 10px; padding: 8px 14px; background: var(--good-dim);
+    color: #d6ffe9; font-size: 12px; border-bottom: 1px solid var(--good);
+  }
+  .connect-banner.show { display: flex; }
+
+  /* ---------- Raw panel ---------- */
+  .raw-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--border); background: #0f1322; }
+  .raw-head .ttl { font-size: 12px; font-weight: 600; color: var(--muted); flex: 1; }
+  .raw-wrap { flex: 1; position: relative; overflow: hidden; }
+  .raw-editor, .raw-hl {
+    margin: 0; border: 0; position: absolute; inset: 0; padding: 12px 14px; overflow: auto;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.55;
+    white-space: pre-wrap; word-break: break-word; tab-size: 2;
+  }
+  .raw-editor {
+    background: transparent; color: transparent; caret-color: #fff; resize: none; z-index: 2;
+  }
+  .raw-editor:focus { outline: none; }
+  .raw-hl { z-index: 1; pointer-events: none; color: var(--syn-txt); background: #0b0e1a; }
+  .raw-hl .t-tag { color: var(--syn-tag); }
+  .raw-hl .t-attr { color: var(--syn-attr); }
+  .raw-hl .t-str { color: var(--syn-str); }
+  .raw-hl .t-com { color: var(--syn-com); font-style: italic; }
+  .raw-foot { padding: 7px 12px; border-top: 1px solid var(--border); background: #0f1322; display: flex; gap: 8px; align-items: center; }
+  .raw-foot .msg { font-size: 11px; color: var(--faint); flex: 1; }
+  .raw-foot .msg.err { color: var(--danger); }
+  .raw-foot .msg.ok { color: var(--good); }
+
+  /* ---------- Modal ---------- */
+  .modal-back {
+    position: fixed; inset: 0; background: rgba(6,8,16,.72); backdrop-filter: blur(3px);
+    display: none; align-items: center; justify-content: center; z-index: 100; padding: 24px;
+  }
+  .modal-back.show { display: flex; }
+  .modal {
+    background: var(--panel); border: 1px solid var(--border-2); border-radius: 14px; box-shadow: var(--shadow);
+    width: 100%; max-width: 920px; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .modal-head { padding: 15px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .modal-head h2 { margin: 0; font-size: 15px; }
+  .modal-head .close { margin-left: auto; background: transparent; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+  .modal-body { padding: 18px; overflow-y: auto; }
+  .modal-foot { padding: 13px 18px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+
+  /* connection review grid */
+  .review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .review-grid { grid-template-columns: 1fr; } }
+  .review-col h4 { margin: 0 0 10px; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .review-preview { background: #fff; border-radius: 8px; padding: 18px; max-height: 420px; overflow: auto; }
+  .review-fields { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow: auto; padding-right: 4px; }
+  .rv-mark { outline: 2px solid var(--good) !important; outline-offset: 1px; background: rgba(53,192,138,.12); }
+  .rv-hover { outline: 2px solid var(--accent) !important; outline-offset: 1px; background: rgba(108,140,255,.1); }
+  .review-preview { position: relative; }
+  .rv-boxlabel { position: absolute; display: none; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 5px; pointer-events: none; z-index: 5; white-space: nowrap; transform: translateY(-2px); }
+  .rv-boxlabel.show { display: block; }
+  .rv-boxlabel.ok { background: var(--good); color: #042a1c; }
+  .rv-boxlabel.warn { background: var(--warn); color: #3a2a04; }
+  /* "show all labels" overlay in review preview */
+  .rv-alllabel { position: absolute; z-index: 6; font-size: 10px; font-weight: 700; line-height: 1.4; padding: 1px 6px; border-radius: 4px; background: var(--good); color: #042a1c; white-space: nowrap; pointer-events: none; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+  .rv-alllabel.tiny { font-size: 8px; padding: 0 3px; border-radius: 3px; opacity: .92; }
+  .rv-alloutline { outline: 1.5px solid rgba(53,192,138,.6) !important; outline-offset: 1px; }
+  .rv-filter { display: flex; gap: 6px; margin-top: 10px; }
+  .rv-chip { font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; cursor: pointer; user-select: none; }
+  .rv-chip:hover { color: var(--text); }
+  .rv-chip.active { color: #fff; border-color: var(--accent); background: var(--accent); }
+  .cfield.compact { padding: 7px 9px; }
+  .cfield.compact .chead { margin-bottom: 0; }
+  .cfield.compact .clabel { font-size: 12px; }
+
+  .hint { font-size: 11px; color: var(--faint); line-height: 1.5; margin: 6px 0 0; }
+  .warnbox { background: rgba(230,179,77,.1); border: 1px solid rgba(230,179,77,.35); color: #f0cd84; border-radius: 8px; padding: 9px 11px; font-size: 11.5px; line-height: 1.5; margin-top: 8px; }
+
   .toast {
     position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(20px);
-    background: var(--good); color: #04281b; padding: 10px 18px; border-radius: 999px;
-    font-size: 13px; font-weight: 600; opacity: 0; pointer-events: none; transition: all .25s ease; z-index: 50;
+    background: var(--good); color: #042a1c; padding: 10px 18px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 600; opacity: 0; pointer-events: none; transition: all .25s; z-index: 200;
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-  .checkbox-row { display: flex; align-items: center; gap: 8px; }
-  .checkbox-row input { width: auto; }
-  .img-preview { margin-top: 8px; }
-  .img-preview img { max-height: 70px; border-radius: 6px; border: 1px solid var(--border); background: #fff; }
-  .tab-pane { display: none; }
-  .tab-pane.active { display: block; }
-  .template-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .template-card { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px; cursor: pointer; font-size: 12px; text-align: center; }
-  .template-card:hover { border-color: var(--accent); }
+  .toast.err { background: var(--danger); color: #fff; }
+
+  .tpl-list { display: flex; flex-direction: column; gap: 7px; }
+  .tpl-item { display: flex; align-items: center; gap: 8px; background: var(--panel-3); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .tpl-item.active { border-color: var(--accent); }
+  .tpl-item .nm { flex: 1; font-size: 12.5px; cursor: pointer; }
+  .tpl-item .mini { background: transparent; border: none; color: var(--faint); cursor: pointer; font-size: 13px; padding: 2px 4px; }
+  .tpl-item .mini:hover { color: var(--text); }
+
+  .file-drop { border: 1.5px dashed var(--border-2); border-radius: 10px; padding: 20px; text-align: center; color: var(--muted); font-size: 12px; cursor: pointer; }
+  .file-drop:hover, .file-drop.over { border-color: var(--accent); color: var(--text); background: var(--panel-2); }
+  textarea.paste-area { min-height: 150px; font-family: ui-monospace, monospace; font-size: 12px; }
+
+  .badge { font-size: 9px; background: var(--accent); color: #fff; border-radius: 4px; padding: 1px 5px; font-weight: 700; }
+  .kbd { font-family: ui-monospace, monospace; font-size: 10px; background: var(--panel-3); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; color: var(--muted); }
+  .checkbox-group { display: flex; flex-direction: column; gap: 7px; }
 </style>
 </head>
 <body>
 <header>
-  <div>
-    <h1>✉️ Email Signature Editor <span class="sub">table-based HTML · inline styles · paste-ready</span></h1>
+  <span class="brand">✉️</span>
+  <h1>Email Signature Builder</h1>
+  <div class="hgroup">
+    <button class="btn ghost small" id="btnUndo" title="Undo (Ctrl+Z)">↶</button>
+    <button class="btn ghost small" id="btnRedo" title="Redo (Ctrl+Y)">↷</button>
   </div>
-  <div class="btn-row">
-    <button class="btn secondary small" id="btnReset">Reset</button>
-    <button class="btn small" id="btnCopyTop">Copy signature</button>
+  <div class="spacer"></div>
+  <div class="hgroup">
+    <button class="btn secondary small" id="btnImport">⇣ Import</button>
+    <button class="btn secondary small" id="btnSaveMenu">⇧ Save / Export</button>
+    <div class="hsep"></div>
+    <button class="btn ghost small" id="btnReset" title="Clear autosave / start fresh">↺ Reset</button>
+    <button class="btn secondary small" id="btnToggleRaw">&lt;/&gt; HTML</button>
+    <button class="btn small" id="btnCopy">Copy signature</button>
   </div>
 </header>
 
-<div class="layout">
-  <!-- ======================= EDITOR ======================= -->
-  <div class="editor">
-    <div class="tabs">
-      <div class="tab active" data-tab="details">Details</div>
-      <div class="tab" data-tab="style">Style</div>
-      <div class="tab" data-tab="links">Links</div>
-      <div class="tab" data-tab="code">HTML</div>
+<div class="app">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="side-tabs">
+      <div class="side-tab active" data-tab="content">Content</div>
+      <div class="side-tab" data-tab="elements">Add</div>
+      <div class="side-tab" data-tab="style">Style</div>
+      <div class="side-tab" data-tab="templates">Templates</div>
     </div>
-
-    <!-- DETAILS -->
-    <div class="tab-pane active" data-pane="details">
-      <div class="section">
-        <h2>Templates</h2>
-        <div class="template-grid">
-          <div class="template-card" data-template="classic">Classic (photo left)</div>
-          <div class="template-card" data-template="stacked">Stacked (no photo)</div>
-          <div class="template-card" data-template="divider">Vertical divider</div>
-          <div class="template-card" data-template="logo">Logo + accent bar</div>
+    <div class="side-body">
+      <!-- CONTENT / PROFILE + connections -->
+      <div class="side-pane active" data-pane="content">
+        <div class="section">
+          <h3>Profile fields <span class="badge" id="connCount">0/0</span></h3>
+          <p class="hint">Hover a field to outline its element in the design. Hover the design to see which field it maps to. Drag a canvas element onto a field to connect it.</p>
+          <div class="rv-filter" id="fieldFilter" style="margin:8px 0;">
+            <span class="rv-chip active" data-f="all">All</span>
+            <span class="rv-chip" data-f="connected">● Linked</span>
+            <span class="rv-chip" data-f="unlinked">○ Unlinked</span>
+          </div>
+          <div id="fieldsHost"></div>
+          <button class="btn ghost small" id="btnAddField" style="margin-top:8px;">+ Custom field</button>
+        </div>
+        <div class="section">
+          <h3>Social links</h3>
+          <div id="socialHost"></div>
+          <button class="btn ghost small" id="btnAddSocial" style="margin-top:8px;">+ Add social link</button>
         </div>
       </div>
 
-      <div class="section">
-        <h2>Person</h2>
-        <div class="field"><label>Full name</label><input type="text" data-field="name" /></div>
-        <div class="field"><label>Job title</label><input type="text" data-field="title" /></div>
-        <div class="field"><label>Company</label><input type="text" data-field="company" /></div>
-        <div class="field"><label>Tagline / department (optional)</label><input type="text" data-field="tagline" /></div>
-      </div>
-
-      <div class="section">
-        <h2>Contact</h2>
-        <div class="row">
-          <div class="field"><label>Phone</label><input type="text" data-field="phone" /></div>
-          <div class="field"><label>Mobile</label><input type="text" data-field="mobile" /></div>
+      <!-- EDIT / ADD -->
+      <div class="side-pane" data-pane="elements">
+        <div class="section" style="padding-bottom:10px;">
+          <h3>Selected element</h3>
+          <div id="inspectorHost"><p class="hint">Select an element on the canvas to edit it here. Double-click text to edit inline.</p></div>
         </div>
-        <div class="field"><label>Email</label><input type="email" data-field="email" /></div>
-        <div class="field"><label>Website</label><input type="url" data-field="website" /></div>
-        <div class="field"><label>Address (optional)</label><input type="text" data-field="address" /></div>
-      </div>
-
-      <div class="section">
-        <h2>Image</h2>
-        <div class="field">
-          <label>Image URL (photo or logo)</label>
-          <input type="url" data-field="imageUrl" placeholder="https://… (use a hosted URL for email)" />
-        </div>
-        <div class="field">
-          <label>Or upload (embeds as data URI — see note)</label>
-          <input type="file" id="imageUpload" accept="image/*" />
-        </div>
-        <div class="row">
-          <div class="field"><label>Width (px)</label><input type="number" data-field="imageWidth" min="20" max="400" /></div>
-          <div class="field">
-            <label>Shape</label>
-            <select data-field="imageShape">
-              <option value="square">Square</option>
-              <option value="round">Rounded</option>
-              <option value="circle">Circle</option>
-            </select>
+        <div class="section collapsible collapsed" id="addSection">
+          <h3 class="collapse-head" id="addHead"><span class="caret">▸</span> Add elements <span class="hint" style="font-weight:400;margin:0;">(drag to canvas)</span></h3>
+          <div class="collapse-body">
+            <div class="palette" id="palette" style="margin-top:8px;">
+              <div class="pal-item" draggable="true" data-add="text"><span class="ic">🅣</span>Text</div>
+              <div class="pal-item" draggable="true" data-add="heading"><span class="ic">H</span>Heading</div>
+              <div class="pal-item" draggable="true" data-add="image"><span class="ic">🖼️</span>Image / GIF</div>
+              <div class="pal-item" draggable="true" data-add="button"><span class="ic">⬢</span>Button</div>
+              <div class="pal-item" draggable="true" data-add="social"><span class="ic">🔗</span>Social row</div>
+              <div class="pal-item" draggable="true" data-add="divider"><span class="ic">―</span>Divider</div>
+              <div class="pal-item" draggable="true" data-add="spacer"><span class="ic">↕</span>Spacer</div>
+              <div class="pal-item" draggable="true" data-add="table"><span class="ic">▦</span>Table</div>
+              <div class="pal-item" draggable="true" data-add="columns"><span class="ic">◫</span>2 Columns</div>
+              <div class="pal-item" draggable="true" data-add="html"><span class="ic">&lt;/&gt;</span>Raw HTML</div>
+            </div>
           </div>
         </div>
-        <div class="img-preview" id="imgPreview"></div>
-        <p class="hint">⚠️ Uploaded images embed as base64 data URIs. Many email clients (esp. Outlook & Gmail) block these. For reliable delivery, host the image and paste its public URL.</p>
       </div>
-    </div>
 
-    <!-- STYLE -->
-    <div class="tab-pane" data-pane="style">
-      <div class="section">
-        <h2>Typography</h2>
-        <div class="field">
-          <label>Font family</label>
-          <select data-field="fontFamily">
-            <option value="Arial, Helvetica, sans-serif">Arial</option>
-            <option value="Helvetica, Arial, sans-serif">Helvetica</option>
-            <option value="Georgia, 'Times New Roman', serif">Georgia</option>
-            <option value="'Trebuchet MS', Verdana, sans-serif">Trebuchet MS</option>
-            <option value="Verdana, Geneva, sans-serif">Verdana</option>
-            <option value="Tahoma, Verdana, sans-serif">Tahoma</option>
-            <option value="'Courier New', Courier, monospace">Courier New</option>
-          </select>
+      <!-- STYLE -->
+      <div class="side-pane" data-pane="style">
+        <div id="styleHost"></div>
+      </div>
+
+      <!-- TEMPLATES -->
+      <div class="side-pane" data-pane="templates">
+        <div class="section">
+          <h3>Starter layouts</h3>
+          <div class="palette" id="starterHost"></div>
         </div>
-        <div class="row">
-          <div class="field"><label>Base size (px)</label><input type="number" data-field="fontSize" min="10" max="20" /></div>
-          <div class="field"><label>Name size (px)</label><input type="number" data-field="nameSize" min="12" max="30" /></div>
+        <div class="section">
+          <h3>My templates</h3>
+          <div class="tpl-list" id="tplList"></div>
+          <div class="row2" style="margin-top:10px;">
+            <input type="text" id="tplName" placeholder="Template name" />
+            <button class="btn small" id="btnSaveTpl" style="flex:0 0 auto;">Save current</button>
+          </div>
+          <p class="hint">Switching templates keeps your profile (name, photo, org, socials…) and re-applies it.</p>
         </div>
       </div>
-      <div class="section">
-        <h2>Colors</h2>
-        <div class="field"><label>Text</label><div class="color-row"><input type="color" data-color="textColor" /><input type="text" data-field="textColor" /></div></div>
-        <div class="field"><label>Name</label><div class="color-row"><input type="color" data-color="nameColor" /><input type="text" data-field="nameColor" /></div></div>
-        <div class="field"><label>Accent (links, divider, bar)</label><div class="color-row"><input type="color" data-color="accentColor" /><input type="text" data-field="accentColor" /></div></div>
-        <div class="field"><label>Muted (title, labels)</label><div class="color-row"><input type="color" data-color="mutedColor" /><input type="text" data-field="mutedColor" /></div></div>
-      </div>
-      <div class="section">
-        <h2>Options</h2>
-        <div class="field checkbox-row"><input type="checkbox" data-field="showLabels" /><label style="margin:0;">Show field labels (P: / M: / E:)</label></div>
-        <div class="field checkbox-row"><input type="checkbox" data-field="showDivider" /><label style="margin:0;">Show divider line above signature</label></div>
-        <div class="field"><label>Spacing between rows (px)</label><input type="number" data-field="rowSpacing" min="0" max="12" /></div>
-      </div>
     </div>
+  </aside>
 
-    <!-- LINKS -->
-    <div class="tab-pane" data-pane="links">
-      <div class="section">
-        <h2>Social & custom links</h2>
-        <div class="links-list" id="linksList"></div>
-        <div style="margin-top:12px;"><button class="btn secondary small" id="btnAddLink">+ Add link</button></div>
-        <p class="hint">Icons use hosted SVG badges. Choose a type or pick "Custom" for a text link.</p>
+  <!-- resizer between sidebar and center -->
+  <div class="resizer" id="resizeLeft" title="Drag to resize"></div>
+
+  <!-- ============ CENTER / CANVAS ============ -->
+  <main class="center">
+    <div class="ctoolbar">
+      <div class="seg" title="Preview device">
+        <span class="pill active" data-device="desktop" title="Desktop monitor">🖥</span>
+        <span class="pill" data-device="laptop" title="Laptop">💻</span>
+        <span class="pill" data-device="mobile" title="Mobile phone">📱</span>
       </div>
+      <span class="pill" id="bgPill" data-bg="light">◻ Light</span>
+      <span class="pill active" id="editPill" title="Toggle edit chrome">✎ Edit</span>
+      <div class="seg" title="Canvas overlays">
+        <span class="pill" id="labelsPill" title="Show all role labels">🏷 Labels</span>
+        <span class="pill" id="boxesPill" title="Show all bounding boxes">▭ Boxes</span>
+      </div>
+      <div class="spacer" style="flex:1;"></div>
+      <span class="pill" id="fitPill" title="Fit &amp; center">⊡ Fit</span>
+      <span class="zoomctl">
+        <button class="zbtn" id="zoomOut" title="Zoom out">−</button>
+        <span id="zoomVal">100%</span>
+        <button class="zbtn" id="zoomIn" title="Zoom in">+</button>
+      </span>
+      <span class="pill" id="normalizePill" title="Normalize tags / rebuild">⟳ Normalize</span>
+      <span class="hint" id="healthHint"></span>
     </div>
-
-    <!-- CODE -->
-    <div class="tab-pane" data-pane="code">
-      <div class="section">
-        <h2>Raw HTML (editable)</h2>
-        <div class="code-box">
-          <textarea id="codeArea" spellcheck="false"></textarea>
+    <div class="connect-banner" id="connectBanner">
+      <span>🔗 Connect mode: click an element in the canvas to link it to <b id="connectFieldName"></b></span>
+      <button class="btn ghost small" id="connectCancel" style="margin-left:auto;">Cancel</button>
+    </div>
+    <div class="stage" id="stage">
+      <div class="canvas-viewport" id="canvasViewport">
+        <div class="canvas-shell desktop editing" id="canvasShell">
+          <div class="paper" id="paper"></div>
         </div>
-        <div class="btn-row" style="margin-top:10px;">
-          <button class="btn secondary small" id="btnApplyCode">Apply HTML → preview</button>
-          <button class="btn ghost small" id="btnRegen">Regenerate from form</button>
-        </div>
-        <p class="hint">Edit the HTML directly for full control (add tables, cells, etc.). "Apply" renders your edits in the preview. "Regenerate" rebuilds from the form fields (discards manual edits).</p>
       </div>
+      <div class="canvas-box" id="canvasBox"><span class="cb-label" id="canvasBoxLabel"></span></div>
+      <div class="pan-hint" id="panHint">Middle-drag to pan · ⊡ Fit to recenter</div>
     </div>
-  </div>
+  </main>
 
-  <!-- ======================= PREVIEW ======================= -->
-  <div class="preview-wrap">
-    <div class="toolbar">
-      <div class="device-toggle">
-        <span class="pill active" data-device="desktop">🖥 Desktop</span>
-        <span class="pill" data-device="mobile">📱 Mobile</span>
-      </div>
-      <span class="pill" id="bgToggle" data-bg="light">◻️ Light bg</span>
-      <div style="flex:1;"></div>
-      <button class="btn secondary small" id="btnCopyHtml">Copy HTML</button>
-      <button class="btn secondary small" id="btnDownload">Download .html</button>
-      <button class="btn small" id="btnCopy">Copy signature (rich)</button>
+  <!-- resizer between center and raw panel -->
+  <div class="resizer" id="resizeRight" title="Drag to resize"></div>
+
+  <!-- ============ RAW HTML PANEL ============ -->
+  <aside class="rawpanel collapsed" id="rawPanel">
+    <div class="raw-head">
+      <span class="ttl">Raw HTML <span class="hint" style="font-weight:400;">· two-way live sync</span></span>
+      <button class="btn ghost small" id="btnFormatHtml">Format</button>
     </div>
-    <div class="preview-frame" id="previewFrame">
-      <div id="previewContent"></div>
+    <div class="raw-wrap">
+      <pre class="raw-hl" id="rawHl" aria-hidden="true"></pre>
+      <textarea class="raw-editor" id="rawEditor" spellcheck="false"></textarea>
     </div>
-    <p class="hint">
-      <b>How to use it:</b> Click <b>Copy signature (rich)</b>, then paste into Gmail Settings → Signature, Outlook → Signatures,
-      or Apple Mail. Use <b>Copy HTML</b> if your client has a "paste HTML / source" option.
-    </p>
+    <div class="raw-foot">
+      <span class="msg" id="rawMsg">Edit here — changes apply to the design live.</span>
+    </div>
+  </aside>
+</div>
+
+<!-- ============ MODALS ============ -->
+<div class="modal-back" id="modalBack">
+  <div class="modal" id="modal">
+    <div class="modal-head">
+      <h2 id="modalTitle">Title</h2>
+      <button class="close" id="modalClose">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
+<input type="file" id="hiddenFile" style="display:none" />
 
 <script>
+"use strict";
+/* ================================================================
+   Email Signature Builder — single-file app
+   ================================================================ */
 (function () {
-  "use strict";
 
-  // ---------- Default state ----------
-  const DEFAULT = {
-    template: "classic",
-    name: "Jordan Rivera",
-    title: "Senior Product Designer",
-    company: "Northwind Studio",
-    tagline: "Design & Brand",
-    phone: "+1 (555) 123-4567",
-    mobile: "",
-    email: "jordan@northwind.studio",
-    website: "www.northwind.studio",
-    address: "123 Market St, Suite 400, San Francisco, CA",
-    imageUrl: "https://i.pravatar.cc/200?img=12",
-    imageWidth: 90,
-    imageShape: "circle",
-    fontFamily: "Arial, Helvetica, sans-serif",
-    fontSize: 13,
-    nameSize: 18,
-    textColor: "#333333",
-    nameColor: "#1a1a2e",
-    accentColor: "#6c8cff",
-    mutedColor: "#777777",
-    showLabels: false,
-    showDivider: true,
-    rowSpacing: 3,
-    links: [
-      { type: "linkedin", url: "https://linkedin.com/in/jordanrivera" },
-      { type: "twitter", url: "https://twitter.com/jordanr" }
-    ]
-  };
-
-  const STORAGE_KEY = "sig-editor-state-v1";
-  let state = load();
-  let manualHtml = null; // when user edits raw HTML
-
-  function load() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return Object.assign({}, DEFAULT, JSON.parse(raw));
-    } catch (e) {}
-    return JSON.parse(JSON.stringify(DEFAULT));
+/* ---------- tiny DOM helpers ---------- */
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const el = (tag, attrs, html) => {
+  const n = document.createElement(tag);
+  if (attrs) for (const k in attrs) {
+    if (k === "class") n.className = attrs[k];
+    else if (k === "style") n.setAttribute("style", attrs[k]);
+    else if (k.startsWith("on") && typeof attrs[k] === "function") n.addEventListener(k.slice(2), attrs[k]);
+    else if (attrs[k] != null) n.setAttribute(k, attrs[k]);
   }
-  function save() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
-  }
+  if (html != null) n.innerHTML = html;
+  return n;
+};
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function uid(p){ return (p||"id") + Math.random().toString(36).slice(2,9); }
+function normUrl(u){ if(!u) return ""; if(/^(https?:|mailto:|tel:|#)/i.test(u)) return u; return "https://"+u; }
+function debounce(fn, ms){ let t; return function(){ clearTimeout(t); const a=arguments, c=this; t=setTimeout(()=>fn.apply(c,a), ms); }; }
 
-  // ---------- Helpers ----------
-  const $ = (sel, root) => (root || document).querySelector(sel);
-  const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
-  function esc(s) {
-    return String(s == null ? "" : s)
-      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-  }
-  function normUrl(u) {
-    if (!u) return "";
-    if (/^https?:\/\//i.test(u) || /^mailto:/i.test(u) || /^tel:/i.test(u)) return u;
-    return "https://" + u;
-  }
+/* ---------- role vocabulary (left panel fields) ---------- */
+const ROLES = [
+  { key:"photo",      label:"Photo",            type:"image" },
+  { key:"logo",       label:"Logo",             type:"image" },
+  { key:"signature",  label:"Signature",        type:"image" },
+  { key:"name",       label:"Name",             type:"text"  },
+  { key:"title",      label:"Job title",        type:"text"  },
+  { key:"company",    label:"Company / Org",    type:"text"  },
+  { key:"tagline",    label:"Tagline",          type:"text"  },
+  { key:"phone",      label:"Phone",            type:"text"  },
+  { key:"mobile",     label:"Mobile",           type:"text"  },
+  { key:"email",      label:"Email",            type:"email" },
+  { key:"website",    label:"Website",          type:"url"   },
+  { key:"address",    label:"Address",          type:"text"  },
+  { key:"banner",     label:"Banner / CTA image", type:"image" },
+  { key:"disclaimer", label:"Disclaimer / legal", type:"text" }
+];
+const ROLE_BY_KEY = Object.fromEntries(ROLES.map(r=>[r.key,r]));
 
-  // Social icon badges (hosted, reliable for email)
-  const ICONS = {
-    linkedin: "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/linkedin.svg",
-    twitter:  "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/twitter.svg",
-    github:   "https://cdn.jsdelivr.net/gh/simple-icons/simple-icons@latest/icons/github.svg",
-    instagram:"https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/instagram.svg",
-    facebook: "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/facebook.svg",
-    youtube:  "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/youtube.svg"
-  };
-  const LINK_TYPES = ["linkedin","twitter","github","instagram","facebook","youtube","custom"];
-  const LINK_LABELS = { linkedin:"LinkedIn", twitter:"Twitter/X", github:"GitHub", instagram:"Instagram", facebook:"Facebook", youtube:"YouTube", custom:"Custom" };
+const SOCIAL_TYPES = {
+  linkedin:{label:"LinkedIn", icon:"https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/linkedin.svg"},
+  twitter:{label:"Twitter/X", icon:"https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/twitter.svg"},
+  github:{label:"GitHub", icon:"https://cdn.jsdelivr.net/gh/simple-icons/simple-icons@latest/icons/github.svg"},
+  instagram:{label:"Instagram", icon:"https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/instagram.svg"},
+  facebook:{label:"Facebook", icon:"https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/facebook.svg"},
+  youtube:{label:"YouTube", icon:"https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/youtube.svg"}
+};
 
-  // ---------- HTML generation (table-based, inline styles) ----------
-  function radius(shape, w) {
-    if (shape === "circle") return Math.round(w / 2);
-    if (shape === "round") return 10;
-    return 0;
+/* ================================================================
+   STATE
+   ================================================================ */
+const DEFAULT_STYLE = {
+  fontFamily:"Arial, Helvetica, sans-serif",
+  fontSize:13, nameSize:18,
+  textColor:"#333333", nameColor:"#1a1a2e", accentColor:"#6c8cff", mutedColor:"#777777",
+  linkColor:"#6c8cff",
+  buttonRadius:6, buttonBg:"#6c8cff", buttonText:"#ffffff",
+  imageRadius:0, rowSpacing:3,
+  customTokens:[] // {id,name,kind:'color'|'font',value}
+};
+const DEFAULT_PROFILE = {
+  photo:"https://i.pravatar.cc/200?img=12",
+  logo:"",
+  signature:"",
+  name:"Jordan Rivera",
+  title:"Senior Product Designer",
+  company:"Northwind Studio",
+  tagline:"Design & Brand",
+  phone:"+1 (555) 123-4567",
+  mobile:"",
+  email:"jordan@northwind.studio",
+  website:"www.northwind.studio",
+  address:"123 Market St, San Francisco, CA",
+  banner:"",
+  disclaimer:""
+};
+const DEFAULT_SOCIALS = [
+  { id:uid("s"), type:"linkedin", url:"https://linkedin.com/in/jordanrivera" },
+  { id:uid("s"), type:"twitter",  url:"https://twitter.com/jordanr" }
+];
+
+/* App state. `html` is the live signature body markup (source of truth for layout).
+   `bindings` maps roleKey -> blockId so profile edits reflect into the markup. */
+let state = {
+  profile: deepClone(DEFAULT_PROFILE),
+  socials: deepClone(DEFAULT_SOCIALS),
+  style:   deepClone(DEFAULT_STYLE),
+  html:    "",                 // signature inner html
+  customFields: [],            // {key,label,type,value}
+  lineIcons: {},               // roleKey -> icon URL (optional leading icon per line)
+  device:"desktop", bg:"light", editMode:true, rawOpen:false,
+  showLabels:false, showBoxes:false
+};
+
+/* built-in leading-icon set (hosted, email-safe) for contact lines etc. */
+const LINE_ICON_SET = {
+  phone:   "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/phone.svg",
+  email:   "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/feedback.svg",
+  website: "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/globe.svg",
+  address: "https://cdn.jsdelivr.net/gh/MarceloPrado/flat-color-icons@master/svg/marker.svg"
+};
+
+const LS_KEY = "sig-builder-v2";
+const LS_TPL = "sig-builder-templates-v2";
+
+function deepClone(o){ return JSON.parse(JSON.stringify(o)); }
+
+/* ---------- history (undo/redo) ---------- */
+const history = { stack:[], index:-1, max:60, lock:false };
+function snapshot(){
+  if (history.lock) return;
+  const snap = JSON.stringify({ profile:state.profile, socials:state.socials, style:state.style, html:state.html, customFields:state.customFields, lineIcons:state.lineIcons });
+  if (history.stack[history.index] === snap) return;
+  history.stack = history.stack.slice(0, history.index+1);
+  history.stack.push(snap);
+  if (history.stack.length > history.max) history.stack.shift();
+  history.index = history.stack.length - 1;
+  updateUndoButtons();
+}
+function restore(snap){
+  const o = JSON.parse(snap);
+  history.lock = true;
+  state.profile = o.profile; state.socials = o.socials; state.style = o.style; state.html = o.html; state.customFields = o.customFields || []; state.lineIcons = o.lineIcons || {};
+  history.lock = false;
+  renderAll(); persist();
+}
+function undo(){ if (history.index>0){ history.index--; restore(history.stack[history.index]); updateUndoButtons(); } }
+function redo(){ if (history.index < history.stack.length-1){ history.index++; restore(history.stack[history.index]); updateUndoButtons(); } }
+function updateUndoButtons(){ $("#btnUndo").disabled = history.index<=0; $("#btnRedo").disabled = history.index>=history.stack.length-1; }
+
+/* ---------- persistence / autosave ---------- */
+const persist = debounce(function(){
+  try { localStorage.setItem(LS_KEY, JSON.stringify({
+    profile:state.profile, socials:state.socials, style:state.style, html:state.html,
+    customFields:state.customFields, lineIcons:state.lineIcons, device:state.device, bg:state.bg,
+    showLabels:state.showLabels, showBoxes:state.showBoxes
+  })); } catch(e){}
+}, 300);
+function loadPersisted(){
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw){ const o = JSON.parse(raw); Object.assign(state, {
+      profile:Object.assign(deepClone(DEFAULT_PROFILE), o.profile||{}),
+      socials:o.socials||deepClone(DEFAULT_SOCIALS),
+      style:Object.assign(deepClone(DEFAULT_STYLE), o.style||{}),
+      html:o.html||"", customFields:o.customFields||[], lineIcons:o.lineIcons||{},
+      device:o.device||"desktop", bg:o.bg||"light",
+      showLabels:!!o.showLabels, showBoxes:!!o.showBoxes
+    }); return true; }
+  } catch(e){}
+  return false;
+}
+
+/* ---------- toast ---------- */
+let toastT;
+function toast(msg, bad){
+  const t = $("#toast"); t.textContent = msg; t.classList.toggle("err", !!bad);
+  t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove("show"), 2000);
+}
+
+/* ================================================================
+   STYLE HELPERS — shared inline-style strings for email safety
+   ================================================================ */
+const S = () => state.style;
+function baseTextStyle(){ const s=S(); return `font-family:${s.fontFamily};font-size:${s.fontSize}px;color:${s.textColor};line-height:1.45;`; }
+
+/* ================================================================
+   LAYOUT GENERATORS (starter templates)
+   Each returns email-safe table HTML with data-sig-role / data-sig-block.
+   ================================================================ */
+function wrapBlock(role, inner, tag){
+  tag = tag || "div";
+  return `<${tag} data-sig-block data-sig-role="${role}">${inner}</${tag}>`;
+}
+
+function imgTag(role, src, w, alt){
+  const s=S();
+  return `<img data-sig-block data-sig-role="${role}" src="${esc(src||"")}" width="${w||90}" alt="${esc(alt||"")}" style="display:block;border:0;width:${w||90}px;border-radius:${s.imageRadius}px;" />`;
+}
+function textBlock(role, html, styleOverride){
+  return `<div data-sig-block data-sig-role="${role}" style="${styleOverride||baseTextStyle()}">${html}</div>`;
+}
+
+function socialRowHtml(){
+  const s=S();
+  const links=(state.socials||[]).filter(l=>l.url);
+  let cells="";
+  links.forEach(l=>{
+    const url=normUrl(l.url);
+    const icon = l.icon || (SOCIAL_TYPES[l.type]&&SOCIAL_TYPES[l.type].icon);
+    const label = (SOCIAL_TYPES[l.type]&&SOCIAL_TYPES[l.type].label)||l.label||l.type;
+    if(icon){
+      cells+=`<td style="padding:0 8px 0 0;"><a href="${esc(url)}"><img src="${esc(icon)}" width="22" height="22" alt="${esc(label)}" style="display:block;border:0;" /></a></td>`;
+    } else {
+      cells+=`<td style="padding:0 10px 0 0;font-family:${s.fontFamily};font-size:${s.fontSize}px;"><a href="${esc(url)}" style="color:${s.linkColor};text-decoration:none;">${esc(l.label||url)}</a></td>`;
+    }
+  });
+  return `<table data-sig-block data-sig-role="social" data-sig-social="1" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;"><tr>${cells||'<td style="font-family:'+s.fontFamily+';font-size:11px;color:#aaa;">(no social links)</td>'}</tr></table>`;
+}
+
+function buttonHtml(role, label, href){
+  const s=S();
+  return `<table data-sig-block data-sig-role="${role||"button"}" data-sig-button="1" cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:separate;"><tr><td style="background:${s.buttonBg};border-radius:${s.buttonRadius}px;"><a href="${esc(normUrl(href||"#"))}" style="display:inline-block;padding:9px 18px;font-family:${s.fontFamily};font-size:${s.fontSize}px;color:${s.buttonText};text-decoration:none;font-weight:600;">${esc(label||"Click here")}</a></td></tr></table>`;
+}
+function dividerHtml(){ const s=S(); return `<table data-sig-block data-sig-role="divider" cellpadding="0" cellspacing="0" border="0" width="100%" role="presentation"><tr><td style="border-top:1px solid ${s.accentColor}33;font-size:0;line-height:0;height:1px;">&nbsp;</td></tr></table>`; }
+function spacerHtml(h){ return `<table data-sig-block data-sig-role="spacer" cellpadding="0" cellspacing="0" border="0" width="100%" role="presentation"><tr><td style="font-size:0;line-height:0;height:${h||12}px;">&nbsp;</td></tr></table>`; }
+
+/* ---- info stack (name/title/contacts) used by starter layouts ---- */
+function infoStack(){
+  const s=S(); const p=state.profile; let h="";
+  h += textBlock("name", esc(p.name), `font-family:${s.fontFamily};font-size:${s.nameSize}px;font-weight:bold;color:${s.nameColor};line-height:1.2;padding-bottom:2px;`);
+  const tc=[p.title,p.company].filter(Boolean).map(esc).join(` <span style="color:${s.accentColor};">·</span> `);
+  if(tc) h += `<div data-sig-block data-sig-role="title" style="font-family:${s.fontFamily};font-size:${s.fontSize}px;color:${s.mutedColor};line-height:1.3;padding-bottom:2px;">${tc}</div>`;
+  if(p.tagline) h += textBlock("tagline", esc(p.tagline), `font-family:${s.fontFamily};font-size:${s.fontSize-1}px;color:${s.mutedColor};padding-bottom:6px;`);
+  h += spacerHtml(6);
+  const line=(role,label,val,href)=>{ if(!val) return ""; const inner= href?`<a href="${esc(href)}" style="color:${s.textColor};text-decoration:none;">${esc(val)}</a>`:esc(val); return `<div data-sig-block data-sig-role="${role}" style="${baseTextStyle()};padding:${s.rowSpacing}px 0;">${inner}</div>`; };
+  h += line("phone","Phone",p.phone, p.phone?("tel:"+String(p.phone).replace(/[^+\d]/g,"")):null);
+  h += line("mobile","Mobile",p.mobile, p.mobile?("tel:"+String(p.mobile).replace(/[^+\d]/g,"")):null);
+  h += line("email","Email",p.email, p.email?("mailto:"+p.email):null);
+  h += line("website","Website",p.website, normUrl(p.website));
+  h += line("address","Address",p.address, null);
+  h += `<div style="padding-top:10px;">${socialRowHtml()}</div>`;
+  return h;
+}
+
+function signatureRow(){ const p=state.profile; if(!p.signature) return ""; return `<tr><td colspan="2" style="padding-bottom:8px;">${imgTag("signature",p.signature,180,"signature")}</td></tr>`; }
+function logoRowBelow(){ const p=state.profile; if(!p.logo) return ""; return `<tr><td colspan="2" style="padding-top:10px;">${imgTag("logo",p.logo,120,p.company)}</td></tr>`; }
+
+const STARTERS = {
+  classic(){ const p=state.profile;
+    return `<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;">`+
+      signatureRow()+
+      `<tr><td style="vertical-align:top;padding-right:18px;">${imgTag("photo",p.photo,90,p.name)}</td>`+
+      `<td style="vertical-align:top;">${infoStack()}</td></tr>`+
+      logoRowBelow()+
+      `</table>`;
+  },
+  stacked(){ return `<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;">`+signatureRow()+`<tr><td style="vertical-align:top;">${infoStack()}</td></tr>`+logoRowBelow()+`</table>`; },
+  divider(){ const p=state.profile; const s=S();
+    return `<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;"><tr>`+
+      `<td style="vertical-align:top;padding-right:16px;">${imgTag("photo",p.photo,80,p.name)}</td>`+
+      `<td style="vertical-align:top;padding-right:16px;width:2px;background:${s.accentColor};font-size:0;">&nbsp;</td>`+
+      `<td style="vertical-align:top;">${infoStack()}</td></tr></table>`;
+  },
+  logo(){ const p=state.profile; const s=S();
+    return `<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;">`+
+      `<tr><td style="padding-bottom:10px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation"><tr>`+
+      `<td style="width:4px;background:${s.accentColor};font-size:0;">&nbsp;</td>`+
+      `<td style="padding-left:12px;">${imgTag("logo",p.logo||p.photo,120,p.company)}</td></tr></table></td></tr>`+
+      `<tr><td>${infoStack()}</td></tr></table>`;
   }
+};
 
-  function contactLine(label, value, href) {
-    if (!value) return "";
-    const lbl = state.showLabels && label ? '<span style="color:' + state.mutedColor + ';">' + label + ' </span>' : "";
-    const inner = href
-      ? '<a href="' + esc(href) + '" style="color:' + state.textColor + '; text-decoration:none;">' + esc(value) + '</a>'
-      : esc(value);
-    return '<tr><td style="padding:' + state.rowSpacing + 'px 0; font-family:' + state.fontFamily +
-      '; font-size:' + state.fontSize + 'px; color:' + state.textColor + '; line-height:1.4;">' +
-      lbl + inner + '</td></tr>';
-  }
+/* ================================================================
+   RENDER — write state.html into the paper, decorate for editing
+   ================================================================ */
+let selectedBlock = null;
 
-  function socialRow() {
-    const links = (state.links || []).filter(l => l.url);
-    if (!links.length) return "";
-    let cells = "";
-    links.forEach(l => {
-      const url = normUrl(l.url);
-      if (l.type === "custom") {
-        cells += '<td style="padding:0 10px 0 0; font-family:' + state.fontFamily + '; font-size:' + state.fontSize +
-          'px;"><a href="' + esc(url) + '" style="color:' + state.accentColor + '; text-decoration:none;">' +
-          esc(l.label || url.replace(/^https?:\/\//, "")) + '</a></td>';
+function renderCanvas(){
+  const paper = $("#paper");
+  paper.classList.toggle("darkbg", state.bg==="dark");
+  // apply the html
+  paper.innerHTML = state.html || "";
+  // re-apply role bindings from profile into the DOM (two-way: model->view)
+  applyProfileToDom(paper);
+  applyStyleToDom(paper);
+  applyLineIcons(paper);
+  decorateBlocks(paper);
+  updateRawFromState();
+  updateHealth();
+  updateConnCount();
+  setupMobileScreen();
+  hideCanvasBox();   // never leave a stale hover box after a re-render
+}
+
+/* refresh the live HTML string from current paper DOM (view->model) */
+function syncHtmlFromPaper(){
+  const paper = $("#paper").cloneNode(true);
+  stripEditorChrome(paper);
+  state.html = paper.innerHTML.trim();
+}
+
+function stripEditorChrome(root){
+  $$("[data-chrome]", root).forEach(n=>n.remove());
+  $$("[data-sig-block]", root).forEach(b=>{
+    b.classList.remove("selected","connecting","highlight");
+    if(!b.getAttribute("class")) b.removeAttribute("class");
+    b.removeAttribute("contenteditable");
+  });
+}
+
+/* decorate blocks with tags, toolbars, resize handles, selection */
+function decorateBlocks(paper){
+  $$("[data-sig-block]", paper).forEach(b=>{
+    const role = b.getAttribute("data-sig-role") || "block";
+    // tag label
+    const tag = el("span", { class:"blocktag", "data-chrome":"1" }, role);
+    b.appendChild(tag);
+    // toolbar
+    const tb = el("div", { class:"block-toolbar", "data-chrome":"1" });
+    tb.appendChild(el("button",{title:"Move up",onclick:ev=>{ev.stopPropagation();moveBlock(b,-1);}},"↑"));
+    tb.appendChild(el("button",{title:"Move down",onclick:ev=>{ev.stopPropagation();moveBlock(b,1);}},"↓"));
+    tb.appendChild(el("button",{title:"Duplicate",onclick:ev=>{ev.stopPropagation();duplicateBlock(b);}},"⧉"));
+    tb.appendChild(el("button",{title:"Delete",onclick:ev=>{ev.stopPropagation();deleteBlock(b);}},"🗑"));
+    b.appendChild(tb);
+    // resize handles for images/buttons/tables
+    const resizable = b.tagName==="IMG" || b.hasAttribute("data-sig-button") || b.tagName==="TABLE";
+    if(resizable){
+      ["rz-se","rz-e","rz-s"].forEach(c=>{ const h=el("div",{class:"rz-handle "+c,"data-chrome":"1","data-dir":c.slice(3)}); b.appendChild(h); attachResize(h,b); });
+    }
+    // selection
+    b.addEventListener("click", ev=>{
+      if(connectMode.active){ ev.stopPropagation(); completeConnect(b); return; }
+      ev.stopPropagation(); selectBlock(b);
+    });
+    // text editing
+    if(isTextBlock(b)){
+      b.addEventListener("dblclick", ()=>{ b.setAttribute("contenteditable","true"); b.focus(); });
+      b.addEventListener("blur", ()=>{ b.removeAttribute("contenteditable"); commitInlineEdit(b); });
+    }
+    // draggable for reordering
+    b.setAttribute("draggable","true");
+    b.addEventListener("dragstart", ev=>onBlockDragStart(ev,b));
+    b.addEventListener("dragend", onBlockDragEnd);
+  });
+}
+
+function isTextBlock(b){
+  const r=b.getAttribute("data-sig-role");
+  const textTags=["DIV","P","SPAN","TD","H1","H2","H3","H4","H5","B","STRONG","EM","FONT","LI","A"];
+  return textTags.includes(b.tagName) && !b.hasAttribute("data-sig-button") && b.tagName!=="IMG" && !["divider","spacer","social"].includes(r);
+}
+
+function selectBlock(b){
+  $$("[data-sig-block].selected", $("#paper")).forEach(n=>n.classList.remove("selected"));
+  if(b){ b.classList.add("selected"); selectedBlock=b; openInspectorFor(b); switchSideTab("elements"); }
+  else { selectedBlock=null; }
+}
+
+function commitInlineEdit(b){
+  // strip chrome nodes that may be inside after editing, then sync
+  $$("[data-chrome]", b).forEach(n=>{ /* keep—will be removed on sync */ });
+  snapshot(); syncHtmlFromPaper(); persist(); updateRawFromState(); updateHealth();
+  // try to reflect edited text back into profile if bound
+  reflectDomToProfile(b);
+}
+
+/* ================================================================
+   PROFILE <-> DOM binding
+   model->view: write profile values into the blocks that carry each role
+   view->model: when user edits text/img in canvas, update profile
+   ================================================================ */
+function applyProfileToDom(paper){
+  const p = state.profile;
+  const hasSeparateCompany = !!paper.querySelector('[data-sig-role="company"]');
+  ROLES.forEach(r=>{
+    const val = p[r.key];
+    // Non-destructive: an empty profile value must NOT wipe imported content.
+    if(val==null || val==="") return;
+    $$(`[data-sig-role="${r.key}"]`, paper).forEach(node=>{
+      if(r.type==="image"){
+        const img = node.tagName==="IMG" ? node : node.querySelector("img");
+        if(img) img.setAttribute("src", val);
+      } else if(r.key==="title" && !hasSeparateCompany && p.company){
+        // our generated layouts render "title · company" in one node;
+        // only do that when there is NO separate company block to avoid clobbering imports
+        setRoleText(node, [p.title,p.company].filter(Boolean).join(" · "), val);
       } else {
-        const icon = ICONS[l.type] || ICONS.linkedin;
-        cells += '<td style="padding:0 8px 0 0;"><a href="' + esc(url) + '"><img src="' + esc(icon) +
-          '" width="22" height="22" alt="' + esc(LINK_LABELS[l.type] || l.type) +
-          '" style="display:block; border:0;" /></a></td>';
+        setRoleText(node, val, val);
       }
     });
-    return '<tr><td style="padding-top:10px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation"><tr>' +
-      cells + '</tr></table></td></tr>';
+  });
+  // custom fields
+  (state.customFields||[]).forEach(f=>{
+    if(f.type==="image" || f.value==null || f.value==="") return;
+    $$(`[data-sig-role="${f.key}"]`, paper).forEach(node=>{ setRoleText(node, f.value, f.value); });
+  });
+}
+/* write text into a role block while preserving a single inner <a> if present
+   (so contact links keep their href but update the visible label) */
+function setRoleText(node, value, raw){
+  if(value==null) return;
+  const chrome = $$("[data-chrome]", node);
+  const a = node.querySelector && node.querySelector("a");
+  if(a && node.querySelectorAll("a").length===1 && !a.querySelector("img")){
+    a.textContent = value;
+  } else if(!node.querySelector || node.children.length===0 || (node.children.length===chrome.length)){
+    // pure text node (only chrome children) — set text then re-append chrome
+    node.textContent = value;
+    chrome.forEach(c=>node.appendChild(c));
   }
+}
 
-  function infoBlock() {
-    let html = "";
-    // Name
-    html += '<tr><td style="padding:0 0 2px; font-family:' + state.fontFamily + '; font-size:' + state.nameSize +
-      'px; font-weight:bold; color:' + state.nameColor + '; line-height:1.2;">' + esc(state.name) + '</td></tr>';
-    // Title + company
-    const tc = [state.title, state.company].filter(Boolean)
-      .map(esc).join(' <span style="color:' + state.accentColor + ';">·</span> ');
-    if (tc) {
-      html += '<tr><td style="padding:0 0 2px; font-family:' + state.fontFamily + '; font-size:' + state.fontSize +
-        'px; color:' + state.mutedColor + '; line-height:1.3;">' + tc + '</td></tr>';
+function reflectDomToProfile(b){
+  const role=b.getAttribute("data-sig-role"); if(!role) return;
+  const r=ROLE_BY_KEY[role];
+  if(r && r.type!=="image" && role!=="title"){
+    const txt=(b.textContent||"").trim();
+    if(txt && state.profile[role]!==undefined){ state.profile[role]=txt; renderFields(); }
+  }
+  const cf=(state.customFields||[]).find(f=>f.key===role);
+  if(cf && cf.type!=="image"){ cf.value=(b.textContent||"").trim(); renderFields(); }
+}
+
+/* ================================================================
+   LINE ICONS — optional leading icon <img> per role line
+   ================================================================ */
+function applyLineIcons(paper){
+  // remove any previously injected icons first (idempotent)
+  $$("img.sig-line-icon",paper).forEach(n=>n.remove());
+  const li=state.lineIcons||{};
+  Object.keys(li).forEach(role=>{
+    const url=li[role]; if(!url) return;
+    const node=paper.querySelector(`[data-sig-role="${role}"]`); if(!node) return;
+    const img=document.createElement("img");
+    img.className="sig-line-icon"; img.src=url; img.width=16; img.height=16;
+    img.setAttribute("style","display:inline-block;vertical-align:middle;width:16px;height:16px;margin-right:7px;border:0;");
+    // insert as the first child (before chrome/content)
+    node.insertBefore(img, node.firstChild);
+  });
+}
+
+/* ================================================================
+   STYLE -> DOM (global restyle of recognized blocks)
+   ================================================================ */
+function applyStyleToDom(paper){
+  const s=S();
+  // buttons
+  $$('[data-sig-button]', paper).forEach(tbl=>{
+    const td=tbl.querySelector("td"); const a=tbl.querySelector("a");
+    if(td){ td.style.background=s.buttonBg; td.style.borderRadius=s.buttonRadius+"px"; }
+    if(a){ a.style.color=s.buttonText; a.style.fontFamily=s.fontFamily; a.style.fontSize=s.fontSize+"px"; }
+  });
+  // images radius (only role photo/logo/banner)
+  $$('img[data-sig-role]', paper).forEach(img=>{
+    const role=img.getAttribute("data-sig-role");
+    if(["photo","logo","banner"].includes(role)) img.style.borderRadius=s.imageRadius+"px";
+  });
+}
+
+/* ================================================================
+   BLOCK OPERATIONS
+   ================================================================ */
+function moveBlock(b, dir){
+  const parent=b.parentNode;
+  if(dir<0 && b.previousElementSibling) parent.insertBefore(b, b.previousElementSibling);
+  else if(dir>0 && b.nextElementSibling) parent.insertBefore(b.nextElementSibling, b);
+  afterStructureChange();
+}
+function duplicateBlock(b){
+  const clone=b.cloneNode(true);
+  $$("[data-chrome]", clone).forEach(n=>n.remove());
+  clone.classList.remove("selected");
+  b.parentNode.insertBefore(clone, b.nextElementSibling);
+  afterStructureChange();
+}
+function deleteBlock(b){ const p=b.parentNode; b.remove(); selectedBlock=null; openInspectorFor(null); afterStructureChange(); }
+
+function afterStructureChange(){ snapshot(); syncHtmlFromPaper(); renderCanvas(); persist(); }
+
+/* ================================================================
+   INIT & top-level render
+   ================================================================ */
+function renderAll(){
+  renderFields();
+  renderSocials();
+  renderStyleMenu();
+  renderStarters();
+  renderTemplatesList();
+  // if no html yet, generate from default starter
+  if(!state.html) state.html = STARTERS.classic();
+  renderCanvas();
+  applyDeviceBg();
+}
+
+function applyDeviceBg(){
+  const shell=$("#canvasShell");
+  shell.classList.toggle("desktop", state.device==="desktop");
+  shell.classList.toggle("laptop", state.device==="laptop");
+  shell.classList.toggle("mobile", state.device==="mobile");
+  shell.classList.toggle("editing", state.editMode);
+  shell.classList.toggle("labels-all", !!state.showLabels);
+  shell.classList.toggle("boxes-all", !!state.showBoxes);
+  $("#paper").classList.toggle("darkbg", state.bg==="dark");
+  $$(".pill[data-device]").forEach(p=>p.classList.toggle("active", p.getAttribute("data-device")===state.device));
+  $("#bgPill").classList.toggle("active", state.bg==="dark");
+  $("#bgPill").textContent = state.bg==="dark" ? "◼ Dark" : "◻ Light";
+  $("#editPill").classList.toggle("active", state.editMode);
+  const lp=$("#labelsPill"); if(lp) lp.classList.toggle("active", !!state.showLabels);
+  const bp=$("#boxesPill"); if(bp) bp.classList.toggle("active", !!state.showBoxes);
+  setupMobileScreen();
+}
+
+/* mobile: wrap the paper in a .phone-screen and scale the (desktop-width) paper
+   down so it fits the phone's screen width — otherwise content overflows. */
+function setupMobileScreen(){
+  const shell=$("#canvasShell"); const paper=$("#paper");
+  let screen=shell.querySelector(".phone-screen");
+  if(state.device==="mobile"){
+    if(!screen){ screen=el("div",{class:"phone-screen"}); paper.parentNode.insertBefore(screen,paper); screen.appendChild(paper); }
+    // scale 640px paper into the ~332px screen (minus a little padding)
+    const target=300, natural=640;
+    const scale=target/natural;
+    paper.style.transform="scale("+scale+")";
+    paper.style.width=natural+"px";
+    // compensate height so the frame hugs the content
+    requestAnimationFrame(()=>{ const h=paper.getBoundingClientRect().height; screen.style.height=(h)+"px"; });
+  } else {
+    if(screen){ shell.insertBefore(paper, screen); screen.remove(); }
+    paper.style.transform=""; paper.style.width="";
+  }
+}
+
+/* ---------- canvas zoom / pan / fit ---------- */
+const view={ zoom:1, x:0, y:0 };
+function applyView(){
+  const vp=$("#canvasViewport"); if(!vp) return;
+  vp.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.zoom})`;
+  const zv=$("#zoomVal"); if(zv) zv.textContent=Math.round(view.zoom*100)+"%";
+  hideCanvasBox();  // overlay coords are stale after pan/zoom
+}
+function setZoom(z){ view.zoom=Math.max(0.25,Math.min(3,z)); applyView(); }
+function fitToView(){
+  view.zoom=1; view.x=0; view.y=0; applyView();
+}
+function clampPan(){
+  // keep the content from being dragged entirely behind a panel
+  const stage=$("#stage"); if(!stage) return;
+  const w=stage.clientWidth, h=stage.clientHeight;
+  const maxX=w*0.6, maxY=h*0.6;
+  view.x=Math.max(-maxX,Math.min(maxX,view.x));
+  view.y=Math.max(-maxY,Math.min(maxY,view.y));
+}
+
+/* -------- placeholders filled by later sections (defined below) -------- */
+/* renderFields, renderSocials, renderStyleMenu, renderStarters,
+   renderTemplatesList, openInspectorFor, switchSideTab, connectMode,
+   completeConnect, attachResize, onBlockDragStart/End, updateRaw*,
+   updateHealth, updateConnCount, import/export — all defined next. */
+
+/* ================================================================
+   EXPORT handle to window so remaining sections attach cleanly
+   (kept in one closure; functions declared with `function` are hoisted) */
+window.__SIGAPP = { state };
+
+/* ================================================================
+   SIDEBAR: profile fields (with drag-to-connect targets)
+   ================================================================ */
+function allFieldDefs(){
+  return ROLES.concat((state.customFields||[]).map(f=>({key:f.key,label:f.label,type:f.type,custom:true})));
+}
+function roleBoundBlock(key){ return $(`#paper [data-sig-role="${key}"]`); }
+
+let fieldFilter="all";
+/* which roles can have an optional paired icon */
+function roleCanHaveIcon(key, custom){ return ["phone","email","website","address","name","title","company"].includes(key) || custom; }
+
+function renderFields(){
+  const host=$("#fieldsHost"); if(!host) return; host.innerHTML="";
+  allFieldDefs().forEach(def=>{
+    const bound = !!roleBoundBlock(def.key);
+    if(fieldFilter==="connected" && !bound) return;
+    if(fieldFilter==="unlinked" && bound) return;
+    // a "group" container holds the TEXT sub-box and (optionally) the ICON sub-box
+    const group=el("div",{class:"cgroup"});
+    group.appendChild(buildFieldBox(def, false));   // text sub-box
+    if(def.type!=="image" && roleCanHaveIcon(def.key, def.custom)){
+      group.appendChild(buildFieldBox(def, true));   // paired icon sub-box
     }
-    if (state.tagline) {
-      html += '<tr><td style="padding:0 0 6px; font-family:' + state.fontFamily + '; font-size:' + (state.fontSize - 1) +
-        'px; color:' + state.mutedColor + '; line-height:1.3;">' + esc(state.tagline) + '</td></tr>';
+    host.appendChild(group);
+  });
+  updateConnCount();
+}
+
+/* build one connectable box. isIcon=false => text/value box; isIcon=true => icon box
+   The icon box binds a separate role "<key>__icon" to an <img> in the design. */
+function buildFieldBox(def, isIcon){
+  const roleKey = isIcon ? def.key+"__icon" : def.key;
+  const label = isIcon ? (def.label+" icon") : def.label;
+  const bound = !!roleBoundBlock(roleKey);
+  const wrap=el("div",{ class:"cfield compact"+(bound?" connected":"")+(isIcon?" iconsub":""), "data-role":roleKey });
+
+  const head=el("div",{class:"chead"});
+  head.appendChild(el("span",{class:"status"}));
+  head.appendChild(el("span",{class:"clabel"}, (isIcon?"⬙ ":"")+esc(label)));
+  head.appendChild(el("span",{class:"cbind"+(bound?"":" unbound")}, bound?"linked":"—"));
+  const editBtn=el("button",{class:"mini-btn",title:isIcon?"Edit icon URL":"Edit value"},"✎");
+  head.appendChild(editBtn);
+  if(bound){
+    const un=el("button",{class:"mini-btn",title:"Disconnect"},"⦸");
+    un.addEventListener("click",()=>unlinkRole(roleKey));
+    head.appendChild(un);
+  } else {
+    const cbtn=el("button",{class:"mini-btn connect",title:"Click, then click the "+(isIcon?"icon image":"element")+" in the design"},"link");
+    cbtn.addEventListener("click",()=>startCanvasConnect(roleKey));
+    head.appendChild(cbtn);
+  }
+  if(def.custom && !isIcon){ const del=el("button",{class:"mini-btn",title:"Remove field"},"×"); del.addEventListener("click",()=>{ state.customFields=state.customFields.filter(f=>f.key!==def.key); renderFields(); }); head.appendChild(del); }
+  wrap.appendChild(head);
+
+  // value / icon-url input
+  let input;
+  const curVal = isIcon ? (state.lineIcons[def.key]||iconSrcFromDom(roleKey)||"")
+                        : (def.custom ? (state.customFields.find(f=>f.key===def.key)||{}).value : state.profile[def.key]);
+  input=el("input",{type:isIcon?"url":(def.type==="email"?"email":def.type==="url"?"url":"text"), placeholder:isIcon?"icon image URL":"value", value:esc(curVal||"")});
+  input.className="cfield-input";
+  input.style.display = (curVal) ? "block" : "none";
+  input.addEventListener("input",()=>{
+    if(isIcon){ setIconForRole(def.key, input.value); }
+    else if(def.custom){ const f=state.customFields.find(x=>x.key===def.key); if(f) f.value=input.value; snapshot(); renderCanvas(); persist(); }
+    else { state.profile[def.key]=input.value; snapshot(); renderCanvas(); persist(); }
+  });
+  editBtn.addEventListener("click",()=>{ input.style.display = input.style.display==="none"?"block":"none"; if(input.style.display==="block") input.focus(); });
+  wrap.appendChild(input);
+
+  // hover highlight both ways
+  wrap.addEventListener("mouseenter",()=>highlightRole(roleKey,true));
+  wrap.addEventListener("mouseleave",()=>highlightRole(roleKey,false));
+  // drag a design element/icon onto this box to connect
+  wrap.addEventListener("dragover",ev=>{ if(dragKind==="block"){ ev.preventDefault(); wrap.classList.add("droptarget"); } });
+  wrap.addEventListener("dragleave",()=>wrap.classList.remove("droptarget"));
+  wrap.addEventListener("drop",ev=>{ ev.preventDefault(); wrap.classList.remove("droptarget"); if(draggedBlock){ connectRoleToBlock(roleKey, draggedBlock); } });
+  return wrap;
+}
+
+/* read the src of an icon-role's bound img in the design */
+function iconSrcFromDom(roleKey){ const n=$(`#paper [data-sig-role="${roleKey}"]`); if(!n) return ""; const img=n.tagName==="IMG"?n:n.querySelector("img"); return img?(img.getAttribute("src")||""):""; }
+
+/* set/clear the icon image for a role. If an icon element is already connected
+   in the design, update its src; otherwise store as a leading icon (lineIcons). */
+function setIconForRole(key, url){
+  const roleKey=key+"__icon";
+  const bound=$(`#paper [data-sig-role="${roleKey}"]`);
+  if(bound){
+    const img=bound.tagName==="IMG"?bound:bound.querySelector("img");
+    if(url){ if(img) img.setAttribute("src",url); } else { delete state.lineIcons[key]; }
+    afterStructureChange();
+  } else {
+    if(url) state.lineIcons[key]=url; else delete state.lineIcons[key];
+    snapshot(); renderCanvas(); persist();
+  }
+}
+
+function highlightRole(key, on){
+  const b=roleBoundBlock(key); if(b){ b.classList.toggle("highlight", on); if(on) showCanvasBox(b, (ROLE_BY_KEY[key]||{}).label||key, true); else hideCanvasBox(); }
+  const f=$(`#fieldsHost .cfield[data-role="${key}"]`); if(f) f.classList.toggle("highlight", on);
+}
+
+/* click a field's "link" button, then click an element in the canvas */
+function startCanvasConnect(key){
+  connectMode.active=true; connectMode.key=key;
+  const def=ROLE_BY_KEY[key]||(state.customFields||[]).find(f=>f.key===key);
+  $("#connectFieldName").textContent = def?def.label:key;
+  $("#connectBanner").classList.add("show");
+  toast("Now click the matching element in the design");
+}
+
+/* ---- canvas hover bounding box overlay ---- */
+function showCanvasBox(target, label, ok){
+  const box=$("#canvasBox"); if(!box||!target||!target.getBoundingClientRect) return;
+  const r=target.getBoundingClientRect();
+  if(r.width===0 && r.height===0){ hideCanvasBox(); return; }
+  // clamp strictly within the stage so the box/label never overlaps side panels
+  const stage=$("#stage"); const sr=stage.getBoundingClientRect();
+  const left=Math.max(r.left, sr.left), top=Math.max(r.top, sr.top);
+  const right=Math.min(r.right, sr.right), bottom=Math.min(r.bottom, sr.bottom);
+  if(right<=left || bottom<=top){ hideCanvasBox(); return; } // fully outside the stage
+  const nearTop = top < sr.top+24;
+  box.className="canvas-box show "+(ok?"ok":"warn")+(nearTop?" label-below":"");
+  box.style.left=(left-2)+"px"; box.style.top=(top-2)+"px";
+  box.style.width=(right-left+4)+"px"; box.style.height=(bottom-top+4)+"px";
+  $("#canvasBoxLabel").textContent=label;
+}
+function hideCanvasBox(){ const box=$("#canvasBox"); if(box) box.className="canvas-box"; }
+
+/* hovering a block in the canvas -> outline it + light up its left field */
+function onCanvasHover(ev){
+  if(connectMode.active) return;
+  const b=ev.target.closest && ev.target.closest("[data-sig-block]");
+  if(!b){ hideCanvasBox(); $$("#fieldsHost .cfield.highlight").forEach(f=>f.classList.remove("highlight")); return; }
+  const role=b.getAttribute("data-sig-role");
+  const def=role && (ROLE_BY_KEY[role] || (state.customFields||[]).find(f=>f.key===role));
+  showCanvasBox(b, def?("● "+def.label):"○ not connected", !!def);
+  $$("#fieldsHost .cfield").forEach(f=>f.classList.toggle("highlight", role && f.getAttribute("data-role")===role));
+}
+
+function connectRoleToBlock(key, block){
+  block = tightestBlock(block) || block;
+  if(!block.hasAttribute("data-sig-block")) block.setAttribute("data-sig-block","");
+  // remove role from any previous holder of this key, set on new block
+  $$(`#paper [data-sig-role="${key}"]`).forEach(n=>{ if(n!==block) n.removeAttribute("data-sig-role"); });
+  block.setAttribute("data-sig-role", key);
+  // pull existing value into profile if empty, else push profile into block
+  const def = ROLE_BY_KEY[key] || (state.customFields.find(f=>f.key===key));
+  if(def){
+    if(def.type==="image" && block.tagName==="IMG"){
+      const cur = key in state.profile ? state.profile[key] : (state.customFields.find(f=>f.key===key)||{}).value;
+      if(cur) block.setAttribute("src",cur); else { if(key in state.profile) state.profile[key]=block.getAttribute("src")||""; }
+    } else if(def.type!=="image"){
+      const cur = key in state.profile ? state.profile[key] : (state.customFields.find(f=>f.key===key)||{}).value;
+      if(!cur){ const t=(block.textContent||"").trim(); if(key in state.profile) state.profile[key]=t; }
     }
-    // spacer
-    html += '<tr><td style="font-size:0; line-height:0; height:6px;">&nbsp;</td></tr>';
-    // contacts
-    html += contactLine("P:", state.phone, "tel:" + String(state.phone).replace(/[^+\d]/g, ""));
-    html += contactLine("M:", state.mobile, "tel:" + String(state.mobile).replace(/[^+\d]/g, ""));
-    html += contactLine("E:", state.email, "mailto:" + state.email);
-    html += contactLine("W:", state.website, normUrl(state.website));
-    html += contactLine("", state.address, null);
-    html += socialRow();
-    return html;
   }
+  afterStructureChange(); renderFields();
+  toast("Linked “"+(def?def.label:key)+"” to element");
+}
+function unlinkRole(key){ $$(`#paper [data-sig-role="${key}"]`).forEach(n=>n.removeAttribute("data-sig-role")); afterStructureChange(); renderFields(); }
 
-  function imageCell(extraStyle) {
-    if (!state.imageUrl) return "";
-    const w = state.imageWidth;
-    const r = radius(state.imageShape, w);
-    return '<td style="vertical-align:top; padding-right:18px; ' + (extraStyle || "") + '">' +
-      '<img src="' + esc(state.imageUrl) + '" width="' + w + '" alt="' + esc(state.name) +
-      '" style="display:block; border:0; width:' + w + 'px; border-radius:' + r + 'px;" /></td>';
-  }
+function updateConnCount(){
+  const defs=allFieldDefs(); const total=defs.length;
+  const linked=defs.filter(d=>roleBoundBlock(d.key)).length;
+  const b=$("#connCount"); if(b) b.textContent=linked+"/"+total;
+}
 
-  function dividerRow() {
-    if (!state.showDivider) return "";
-    return '<tr><td colspan="3" style="padding-bottom:12px;"><table cellpadding="0" cellspacing="0" border="0" width="100%" role="presentation"><tr>' +
-      '<td style="border-top:1px solid ' + state.accentColor + '33; font-size:0; line-height:0;">&nbsp;</td></tr></table></td></tr>';
-  }
+/* custom field creator */
+function addCustomField(){
+  const name=prompt("Field name (e.g. Pronouns, Booking link):"); if(!name) return;
+  const key="cf_"+name.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"")+"_"+Math.random().toString(36).slice(2,5);
+  const type=prompt("Type: text or image","text")==="image"?"image":"text";
+  state.customFields.push({key,label:name,type,value:""});
+  renderFields(); switchSideTab("content");
+}
 
-  function generate() {
-    const t = state.template;
-    let inner = "";
-
-    if (t === "classic") {
-      inner =
-        '<tr>' + imageCell() +
-        '<td style="vertical-align:top;"><table cellpadding="0" cellspacing="0" border="0" role="presentation">' +
-        infoBlock() + '</table></td></tr>';
-    } else if (t === "stacked") {
-      inner = '<tr><td style="vertical-align:top;"><table cellpadding="0" cellspacing="0" border="0" role="presentation">' +
-        infoBlock() + '</table></td></tr>';
-    } else if (t === "divider") {
-      inner = '<tr>' + imageCell() +
-        '<td style="vertical-align:top; padding-right:18px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation">' +
-        '<tr><td style="width:2px; background:' + state.accentColor + '; font-size:0; line-height:0;" height="100%">&nbsp;</td></tr>' +
-        '</table></td>' +
-        '<td style="vertical-align:top;"><table cellpadding="0" cellspacing="0" border="0" role="presentation">' +
-        infoBlock() + '</table></td></tr>';
-    } else if (t === "logo") {
-      inner =
-        '<tr><td colspan="2" style="padding-bottom:10px;">' +
-        '<table cellpadding="0" cellspacing="0" border="0" width="100%" role="presentation"><tr>' +
-        '<td style="width:4px; background:' + state.accentColor + '; font-size:0;">&nbsp;</td>' +
-        '<td style="padding-left:12px; vertical-align:middle;">' +
-        (state.imageUrl ? '<img src="' + esc(state.imageUrl) + '" width="' + state.imageWidth +
-          '" alt="' + esc(state.company) + '" style="display:block; border:0; border-radius:' +
-          radius(state.imageShape, state.imageWidth) + 'px;" />' : "") +
-        '</td></tr></table></td></tr>' +
-        '<tr><td colspan="2"><table cellpadding="0" cellspacing="0" border="0" role="presentation">' +
-        infoBlock() + '</table></td></tr>';
-    }
-
-    const html =
-      '<table cellpadding="0" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;">' +
-      dividerRow() + inner + '</table>';
-
-    return html;
-  }
-
-  function currentHtml() {
-    return manualHtml != null ? manualHtml : generate();
-  }
-
-  // ---------- Render ----------
-  function render() {
-    const html = currentHtml();
-    $("#previewContent").innerHTML = html;
-    if (manualHtml == null) $("#codeArea").value = formatHtml(html);
-    renderImgPreview();
-  }
-
-  function formatHtml(html) {
-    // light pretty-print for readability
-    return html
-      .replace(/></g, ">\n<")
-      .replace(/(<table[^>]*>)/g, "\n$1")
-      .trim();
-  }
-
-  function renderImgPreview() {
-    const box = $("#imgPreview");
-    box.innerHTML = state.imageUrl
-      ? '<img src="' + esc(state.imageUrl) + '" alt="preview" />'
-      : '<span class="hint">No image set.</span>';
-  }
-
-  // ---------- Bind form -> state ----------
-  function syncFormFromState() {
-    $$("[data-field]").forEach(el => {
-      const key = el.getAttribute("data-field");
-      if (!(key in state)) return;
-      if (el.type === "checkbox") el.checked = !!state[key];
-      else el.value = state[key];
+/* ================================================================
+   SIDEBAR: socials
+   ================================================================ */
+function socialIconFor(l){
+  if(l.icon) return l.icon;                     // explicit override
+  const def=SOCIAL_TYPES[l.type]; return def?def.icon:"";
+}
+function renderSocials(){
+  const host=$("#socialHost"); host.innerHTML="";
+  (state.socials||[]).forEach((l)=>{
+    const wrap=el("div",{class:"iconbox", style:"margin-bottom:8px;flex-wrap:wrap;"});
+    // icon preview (updates with type/link)
+    const iconUrl=socialIconFor(l);
+    const prev=el("div",{class:"ic-prev"+(iconUrl?"":" empty")}, iconUrl?`<img src="${esc(iconUrl)}">`:"?");
+    // type select (changing type changes the icon)
+    const sel=el("select",{style:"flex:0 0 96px;"});
+    Object.keys(SOCIAL_TYPES).concat(["custom"]).forEach(t=>{ const o=el("option",{value:t}, t==="custom"?"Custom":SOCIAL_TYPES[t].label); if(t===l.type)o.setAttribute("selected",""); sel.appendChild(o); });
+    sel.value=l.type;
+    const rm=el("button",{class:"btn ghost small", style:"flex:0 0 auto;"},"×");
+    const url=el("input",{class:"ic-url",type:"text", placeholder:"profile URL", value:esc(l.url||"")});
+    const refreshPrev=()=>{ const u=socialIconFor(l); prev.className="ic-prev"+(u?"":" empty"); prev.innerHTML=u?`<img src="${esc(u)}">`:"?"; };
+    sel.addEventListener("change",()=>{ l.type=sel.value; if(l.type!=="custom") delete l.icon; refreshPrev(); renderSocialCustomRow(); snapshot(); renderCanvas(); persist(); });
+    url.addEventListener("input",()=>{ l.url=url.value;
+      // if the URL matches a known network, auto-switch the type (link -> icon sync)
+      for(const k in SOCIAL_HOSTS){ if(SOCIAL_HOSTS[k].test(l.url)){ if(l.type!==k){ l.type=k; sel.value=k; delete l.icon; } break; } }
+      refreshPrev(); snapshot(); renderCanvas(); persist();
     });
-    $$("[data-color]").forEach(el => { el.value = state[el.getAttribute("data-color")]; });
-    renderLinks();
-  }
+    rm.addEventListener("click",()=>{ state.socials=state.socials.filter(x=>x.id!==l.id); snapshot(); renderSocials(); renderCanvas(); persist(); });
+    wrap.appendChild(prev); wrap.appendChild(sel); wrap.appendChild(url); wrap.appendChild(rm);
 
-  function onFieldInput(e) {
-    const el = e.target;
-    const key = el.getAttribute("data-field");
-    if (!key) return;
-    if (el.type === "checkbox") state[key] = el.checked;
-    else if (el.type === "number") state[key] = Number(el.value);
-    else state[key] = el.value;
-    // keep paired color text/input in sync
-    if (el.hasAttribute("data-field")) {
-      const colorInput = $('[data-color="' + key + '"]');
-      if (colorInput && /^#?[0-9a-fA-F]{3,6}$/.test(el.value)) colorInput.value = el.value.startsWith("#") ? el.value : "#" + el.value;
+    // icon-image URL row — available for ANY type (override the default icon),
+    // plus drag-to-connect: drop an icon element from the design onto this row
+    const custWrap=el("div",{style:"flex-basis:100%;"});
+    const ci=el("input",{type:"url",placeholder:"icon image URL (optional override)",value:esc(l.icon||""),style:"margin-top:6px;"});
+    ci.addEventListener("input",()=>{ l.icon=ci.value; refreshPrev(); snapshot(); renderCanvas(); persist(); });
+    custWrap.appendChild(ci);
+    if(l.type==="custom"){
+      const lbl=el("input",{type:"text",placeholder:"text label (if no icon)",value:esc(l.label||""),style:"margin-top:6px;"});
+      lbl.addEventListener("input",()=>{ l.label=lbl.value; snapshot(); renderCanvas(); persist(); });
+      custWrap.appendChild(lbl);
     }
-    manualHtml = null; // form edits override manual html
-    save(); render();
-  }
+    custWrap.appendChild(el("div",{class:"hint",style:"margin-top:4px;"},"Tip: drag an icon image from the design onto this row to use it."));
+    wrap.appendChild(custWrap);
 
-  function onColorInput(e) {
-    const key = e.target.getAttribute("data-color");
-    state[key] = e.target.value;
-    const txt = $('[data-field="' + key + '"]');
-    if (txt) txt.value = e.target.value;
-    manualHtml = null; save(); render();
-  }
+    // drop a dragged design image here -> use its src as this social's icon
+    wrap.addEventListener("dragover",ev=>{ if(draggedBlock||reviewDragEl){ ev.preventDefault(); wrap.classList.add("droptarget"); } });
+    wrap.addEventListener("dragleave",()=>wrap.classList.remove("droptarget"));
+    wrap.addEventListener("drop",ev=>{ ev.preventDefault(); wrap.classList.remove("droptarget");
+      const src=iconSrcFromDraggedEl(); if(src){ l.icon=src; ci.value=src; refreshPrev(); snapshot(); renderCanvas(); persist(); toast("Icon linked to "+(SOCIAL_TYPES[l.type]?SOCIAL_TYPES[l.type].label:l.type)); }
+    });
+    host.appendChild(wrap);
+  });
+}
+/* get the <img> src from whatever element is currently being dragged (canvas or review) */
+function iconSrcFromDraggedEl(){
+  const el2=draggedBlock||reviewDragEl; if(!el2) return "";
+  const img = el2.tagName==="IMG" ? el2 : (el2.querySelector && el2.querySelector("img"));
+  return img ? (img.getAttribute("src")||"") : "";
+}
 
-  // ---------- Links UI ----------
-  function renderLinks() {
-    const list = $("#linksList");
-    list.innerHTML = "";
-    (state.links || []).forEach((link, i) => {
-      const row = document.createElement("div");
-      row.className = "link-item";
-      const sel = document.createElement("select");
-      LINK_TYPES.forEach(tp => {
-        const o = document.createElement("option");
-        o.value = tp; o.textContent = LINK_LABELS[tp];
-        if (tp === link.type) o.selected = true;
-        sel.appendChild(o);
+/* ================================================================
+   SIDEBAR: style menu + eyedropper + custom tokens
+   ================================================================ */
+function colorControl(label, key){
+  const wrap=el("div",{class:"field"});
+  wrap.appendChild(el("label",null,esc(label)));
+  const row=el("div",{class:"color-row"});
+  const sw=el("input",{type:"color", class:"swatch", value:toHex(S()[key])});
+  const tx=el("input",{type:"text", value:S()[key]});
+  const eye=el("button",{class:"eyedrop", title:"Pick color from screen"},"⟡");
+  sw.addEventListener("input",()=>{ setStyle(key, sw.value); tx.value=sw.value; });
+  tx.addEventListener("input",()=>{ setStyle(key, tx.value); if(/^#[0-9a-f]{3,6}$/i.test(tx.value)) sw.value=toHex(tx.value); });
+  eye.addEventListener("click",async()=>{
+    if(window.EyeDropper){ try{ const r=await new EyeDropper().open(); setStyle(key,r.sRGBHex); sw.value=toHex(r.sRGBHex); tx.value=r.sRGBHex; toast("Picked "+r.sRGBHex); }catch(e){} }
+    else toast("EyeDropper not supported in this browser", true);
+  });
+  row.appendChild(sw); row.appendChild(tx); row.appendChild(eye);
+  wrap.appendChild(row);
+  return wrap;
+}
+function toHex(c){ if(!c) return "#000000"; if(/^#[0-9a-f]{6}$/i.test(c)) return c; if(/^#[0-9a-f]{3}$/i.test(c)) return "#"+c.slice(1).split("").map(x=>x+x).join(""); return c; }
+function setStyle(key,val){ state.style[key]=val; snapshot(); renderCanvas(); persist(); }
+
+function sliderControl(label,key,min,max,unit){
+  const wrap=el("div",{class:"field"});
+  wrap.appendChild(el("label",null,esc(label)));
+  const row=el("div",{class:"slider-row"});
+  const r=el("input",{type:"range",min,max,value:S()[key]});
+  const v=el("span",{class:"val"}, S()[key]+(unit||""));
+  r.addEventListener("input",()=>{ setStyle(key,Number(r.value)); v.textContent=r.value+(unit||""); });
+  row.appendChild(r); row.appendChild(v); wrap.appendChild(row); return wrap;
+}
+
+function renderStyleMenu(){
+  const host=$("#styleHost"); host.innerHTML="";
+
+  const typo=el("div",{class:"section"}); typo.appendChild(el("h3",null,"Typography"));
+  const ff=el("select");
+  const fonts=["Arial, Helvetica, sans-serif","Helvetica, Arial, sans-serif","Georgia, 'Times New Roman', serif","'Trebuchet MS', Verdana, sans-serif","Verdana, Geneva, sans-serif","Tahoma, Verdana, sans-serif","'Courier New', Courier, monospace"];
+  (state.style.customTokens||[]).filter(t=>t.kind==="font").forEach(t=>fonts.push(t.value));
+  fonts.forEach(f=>{ const o=el("option",{value:f}, f.split(",")[0].replace(/'/g,"")); if(f===state.style.fontFamily)o.setAttribute("selected",""); ff.appendChild(o); });
+  ff.value=state.style.fontFamily;
+  ff.addEventListener("change",()=>setStyle("fontFamily",ff.value));
+  const ffField=el("div",{class:"field"}); ffField.appendChild(el("label",null,"Font family")); ffField.appendChild(ff); typo.appendChild(ffField);
+  typo.appendChild(sliderControl("Base text size","fontSize",10,20,"px"));
+  typo.appendChild(sliderControl("Name size","nameSize",12,32,"px"));
+  host.appendChild(typo);
+
+  const col=el("div",{class:"section"}); col.appendChild(el("h3",null,"Colors"));
+  col.appendChild(colorControl("Text","textColor"));
+  col.appendChild(colorControl("Name","nameColor"));
+  col.appendChild(colorControl("Accent","accentColor"));
+  col.appendChild(colorControl("Muted","mutedColor"));
+  col.appendChild(colorControl("Links","linkColor"));
+  host.appendChild(col);
+
+  const btn=el("div",{class:"section"}); btn.appendChild(el("h3",null,"Buttons (global)"));
+  btn.appendChild(sliderControl("Corner radius","buttonRadius",0,28,"px"));
+  btn.appendChild(colorControl("Button background","buttonBg"));
+  btn.appendChild(colorControl("Button text","buttonText"));
+  host.appendChild(btn);
+
+  const img=el("div",{class:"section"}); img.appendChild(el("h3",null,"Images & spacing"));
+  img.appendChild(sliderControl("Image corner radius","imageRadius",0,120,"px"));
+  img.appendChild(sliderControl("Row spacing","rowSpacing",0,14,"px"));
+  host.appendChild(img);
+
+  // custom tokens
+  const ct=el("div",{class:"section"}); ct.appendChild(el("h3",null,"Custom tokens"));
+  const tokHost=el("div"); 
+  (state.style.customTokens||[]).forEach(t=>{
+    const row=el("div",{class:"row2",style:"margin-bottom:7px;align-items:center;"});
+    row.appendChild(el("span",{style:"flex:1;font-size:12px;"}, esc(t.name)+" ("+t.kind+")"));
+    if(t.kind==="color"){ const sw=el("span",{class:"swatch",style:"background:"+t.value+";cursor:default;"}); row.appendChild(sw); }
+    const copy=el("button",{class:"btn ghost small",style:"flex:0 0 auto;"},"copy");
+    copy.addEventListener("click",()=>{ navigator.clipboard && navigator.clipboard.writeText(t.value); toast("Copied "+t.value); });
+    const rm=el("button",{class:"btn ghost small",style:"flex:0 0 auto;"},"×");
+    rm.addEventListener("click",()=>{ state.style.customTokens=state.style.customTokens.filter(x=>x.id!==t.id); renderStyleMenu(); persist(); });
+    row.appendChild(copy); row.appendChild(rm); tokHost.appendChild(row);
+  });
+  ct.appendChild(tokHost);
+  const add=el("button",{class:"btn ghost small",style:"margin-top:6px;"},"+ Add custom color / font");
+  add.addEventListener("click",addCustomToken);
+  ct.appendChild(add);
+  ct.appendChild(el("p",{class:"hint"},"Extra colors/fonts on top of the standard set. Fonts appear in the family dropdown."));
+  host.appendChild(ct);
+}
+function addCustomToken(){
+  const kind=prompt("Token kind: color or font","color")==="font"?"font":"color";
+  const name=prompt(kind==="color"?"Color name (e.g. Brand red):":"Font label:"); if(!name) return;
+  const value=prompt(kind==="color"?"Hex value (e.g. #ff3366):":"CSS font stack (e.g. 'Inter', Arial, sans-serif):"); if(!value) return;
+  state.style.customTokens=state.style.customTokens||[];
+  state.style.customTokens.push({id:uid("tok"),name,kind,value});
+  renderStyleMenu(); persist(); toast("Added custom "+kind);
+}
+
+/* ================================================================
+   SIDEBAR: starter layouts + saved templates
+   ================================================================ */
+function renderStarters(){
+  const host=$("#starterHost"); host.innerHTML="";
+  [["classic","Classic"],["stacked","Stacked"],["divider","Divider"],["logo","Logo bar"]].forEach(([k,lbl])=>{
+    const it=el("div",{class:"pal-item"}, `<span class="ic">▤</span>${lbl}`);
+    it.addEventListener("click",()=>{ applyStarter(k); });
+    host.appendChild(it);
+  });
+}
+function applyStarter(k){
+  if(!STARTERS[k]) return;
+  snapshot(); state.html=STARTERS[k](); renderCanvas(); persist(); toast("Applied layout: "+k);
+}
+
+function getTemplates(){ try{ return JSON.parse(localStorage.getItem(LS_TPL)||"[]"); }catch(e){ return []; } }
+function setTemplates(a){ try{ localStorage.setItem(LS_TPL, JSON.stringify(a)); }catch(e){} }
+function renderTemplatesList(){
+  const host=$("#tplList"); host.innerHTML="";
+  const tpls=getTemplates();
+  if(!tpls.length){ host.appendChild(el("p",{class:"hint"},"No saved templates yet.")); return; }
+  tpls.forEach(t=>{
+    const row=el("div",{class:"tpl-item"});
+    const nm=el("span",{class:"nm"}, esc(t.name)); nm.addEventListener("click",()=>loadTemplate(t.id));
+    const dup=el("button",{class:"mini",title:"Overwrite with current"},"⟲"); dup.addEventListener("click",()=>{ t.html=state.html; t.style=deepClone(state.style); setTemplates(tpls); toast("Updated “"+t.name+"”"); });
+    const del=el("button",{class:"mini",title:"Delete"},"×"); del.addEventListener("click",()=>{ setTemplates(getTemplates().filter(x=>x.id!==t.id)); renderTemplatesList(); });
+    row.appendChild(nm); row.appendChild(dup); row.appendChild(del); host.appendChild(row);
+  });
+}
+function saveTemplate(){
+  const name=($("#tplName").value||"").trim()||("Template "+(getTemplates().length+1));
+  const tpls=getTemplates();
+  tpls.push({ id:uid("tpl"), name, html:state.html, style:deepClone(state.style) });
+  setTemplates(tpls); $("#tplName").value=""; renderTemplatesList(); toast("Saved template “"+name+"”");
+}
+function loadTemplate(id){
+  const t=getTemplates().find(x=>x.id===id); if(!t) return;
+  snapshot(); state.html=t.html; if(t.style) state.style=Object.assign(deepClone(DEFAULT_STYLE),t.style);
+  renderCanvas(); renderStyleMenu(); persist(); toast("Loaded “"+t.name+"” (profile kept)");
+}
+
+/* ================================================================
+   INSPECTOR (selected element editor)
+   ================================================================ */
+function switchSideTab(tab){
+  $$(".side-tab").forEach(t=>t.classList.toggle("active", t.getAttribute("data-tab")===tab));
+  $$(".side-pane").forEach(p=>p.classList.toggle("active", p.getAttribute("data-pane")===tab));
+}
+function openInspectorFor(b){
+  const host=$("#inspectorHost"); host.innerHTML="";
+  if(!b){ host.appendChild(el("p",{class:"hint"},"Select an element on the canvas to edit it here. Double-click text to edit inline.")); return; }
+  const role=b.getAttribute("data-sig-role")||"block";
+  const roleDef=ROLE_BY_KEY[role]||(state.customFields||[]).find(f=>f.key===role);
+
+  // header: role + connect dropdown
+  const rf=el("div",{class:"field"}); rf.appendChild(el("label",null,"Role / connect to field"));
+  const sel=el("select");
+  sel.appendChild(el("option",{value:""},"— none / block —"));
+  allFieldDefs().forEach(d=>{ const o=el("option",{value:d.key}, d.label); if(d.key===role)o.setAttribute("selected",""); sel.appendChild(o); });
+  sel.value = roleDef?role:"";
+  sel.addEventListener("change",()=>{ if(sel.value) connectRoleToBlock(sel.value,b); else unlinkRole(role); });
+  rf.appendChild(sel); host.appendChild(rf);
+
+  const styleTarget = b.querySelector("a") && b.querySelectorAll("a").length===1 && !b.querySelector("a img") ? b.querySelector("a") : b;
+
+  // ---------- IMAGE ----------
+  if(b.tagName==="IMG"){
+    imageInspector(host, b);
+  }
+  // ---------- BUTTON ----------
+  else if(b.hasAttribute("data-sig-button")){
+    const a=b.querySelector("a");
+    textFieldRow(host,"Label", a?a.textContent:"", v=>{ if(a)a.textContent=v; scheduleSyncInspector(); });
+    textFieldRow(host,"Link URL", a?a.getAttribute("href"):"", v=>{ if(a)a.setAttribute("href",normUrl(v)); scheduleSyncInspector(); });
+  }
+  // ---------- SPACER ----------
+  else if(role==="spacer"){
+    const td=b.querySelector("td"); const cur=parseInt((td&&td.style.height)||12);
+    host.appendChild(sliderInline("Height","spacerH",0,60,cur,"px",v=>{ if(td){ td.style.height=v+"px"; } scheduleSyncInspector(); }));
+  }
+  // ---------- TEXT (incl. contact lines with links) ----------
+  else if(isTextBlock(b)){
+    // visible text (edit separately from href)
+    const link = b.querySelector("a");
+    const textHolder = link && b.querySelectorAll("a").length===1 && !link.querySelector("img") ? link : b;
+    const curText = directText(b);
+    textFieldRow(host,"Text", curText, v=>{ setVisibleText(textHolder, v); reflectDomToProfile(b); scheduleSyncInspector(); });
+
+    // link / mailto / tel (independent of the text)
+    if(link || ["phone","email","website"].includes(role)){
+      let a=link;
+      if(!a){ // wrap text in an anchor so the user can add a link
+        a=document.createElement("a"); a.style.color="inherit"; a.style.textDecoration="none";
+        while(b.firstChild && !(b.firstChild.getAttribute && b.firstChild.getAttribute("data-chrome"))) a.appendChild(b.firstChild);
+        b.insertBefore(a,b.firstChild);
+      }
+      textFieldRow(host,"Link (href / mailto: / tel:)", a.getAttribute("href")||"", v=>{
+        if(v) a.setAttribute("href", smartHref(v, role)); else a.removeAttribute("href");
+        scheduleSyncInspector();
       });
-      sel.addEventListener("change", () => { link.type = sel.value; save(); render(); });
+    }
 
-      const url = document.createElement("input");
-      url.type = "text";
-      url.placeholder = link.type === "custom" ? "https://… (label:url optional)" : "Profile URL";
-      url.value = link.url || "";
-      url.addEventListener("input", () => { link.url = url.value; save(); render(); });
-
-      const rm = document.createElement("button");
-      rm.className = "remove"; rm.textContent = "×"; rm.title = "Remove";
-      rm.addEventListener("click", () => { state.links.splice(i, 1); save(); renderLinks(); render(); });
-
-      row.appendChild(sel); row.appendChild(url); row.appendChild(rm);
-      list.appendChild(row);
-    });
+    // rich text formatting toolbar
+    richTextToolbar(host, styleTarget);
+    // leading icon control for contact-ish lines
+    if(["phone","email","website","address"].includes(role) || roleDef){
+      lineIconControl(host, role);
+    }
+  }
+  // ---------- generic / table ----------
+  else {
+    host.appendChild(el("p",{class:"hint"},"This block has no quick-edit fields. Use the HTML panel for fine control, or add a role above."));
   }
 
-  // ---------- Copy / export ----------
-  function showToast(msg, bad) {
-    const t = $("#toast");
-    t.textContent = msg;
-    t.style.background = bad ? "var(--danger)" : "var(--good)";
-    t.style.color = bad ? "#fff" : "#04281b";
-    t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), 1800);
-  }
+  // delete
+  const del=el("button",{class:"btn ghost small",style:"margin-top:10px;color:var(--danger);border-color:var(--danger);"},"🗑 Delete element");
+  del.addEventListener("click",()=>deleteBlock(b));
+  host.appendChild(del);
+}
 
-  async function copyRich() {
-    const html = currentHtml();
-    try {
-      if (navigator.clipboard && window.ClipboardItem) {
-        const item = new ClipboardItem({
-          "text/html": new Blob([html], { type: "text/html" }),
-          "text/plain": new Blob([plainText()], { type: "text/plain" })
-        });
-        await navigator.clipboard.write([item]);
-        showToast("Signature copied — paste into your email client");
-        return;
+/* set the visible text of a node while preserving chrome and any single inner anchor */
+function setVisibleText(node, value){
+  const chrome=$$("[data-chrome]",node);
+  const icon=node.querySelector("img.sig-line-icon");
+  // clear text nodes & inline text, keep chrome + icon + a single anchor shell
+  const a=node.tagName==="A"?node:node.querySelector("a");
+  if(node.tagName==="A"){ node.textContent=value; return; }
+  // remove existing text-bearing children except chrome/icon/anchor
+  Array.from(node.childNodes).forEach(c=>{
+    if(c.nodeType===3){ node.removeChild(c); return; }
+    if(c.nodeType===1 && !c.getAttribute?.("data-chrome") && c!==icon){ /* keep anchor, drop others' text later */ }
+  });
+  if(a){ a.textContent=value; }
+  else { node.insertBefore(document.createTextNode(value), node.firstChild); }
+}
+
+/* build a smart href based on role */
+function smartHref(v, role){
+  v=v.trim();
+  if(/^(https?:|mailto:|tel:|#)/i.test(v)) return v;
+  if(role==="email" && /@/.test(v)) return "mailto:"+v;
+  if(role==="phone") return "tel:"+v.replace(/[^+\d]/g,"");
+  return normUrl(v);
+}
+
+/* a labeled text input row */
+function textFieldRow(host, label, value, onInput){
+  const f=el("div",{class:"field"}); f.appendChild(el("label",null,label));
+  const i=el("input",{type:"text", value:esc(value||"")});
+  i.addEventListener("input",()=>onInput(i.value));
+  f.appendChild(i); host.appendChild(f); return i;
+}
+
+/* image inspector: url, width slider, radius, link-wrap */
+function imageInspector(host, img){
+  textFieldRow(host,"Image URL", img.getAttribute("src")||"", v=>{ img.setAttribute("src",v); scheduleSyncInspector(); });
+  const w=parseInt(img.getAttribute("width")||img.offsetWidth)||120;
+  host.appendChild(sliderInline("Width","imgW",20,600,Math.min(600,w),"px",v=>{ img.setAttribute("width",v); img.style.width=v+"px"; img.style.height="auto"; scheduleSyncInspector(); }));
+  const curR=parseInt((img.style.borderRadius||"0"))||0;
+  host.appendChild(sliderInline("Corner radius","imgR",0,200,curR,"px",v=>{ img.style.borderRadius=v+"px"; scheduleSyncInspector(); }));
+  // link wrap
+  const parentA=img.closest("a");
+  textFieldRow(host,"Link on image (optional)", parentA?parentA.getAttribute("href"):"", v=>{
+    let a=img.closest("a");
+    if(v){ if(!a){ a=document.createElement("a"); img.parentNode.insertBefore(a,img); a.appendChild(img); } a.setAttribute("href",normUrl(v)); }
+    else if(a){ a.parentNode.insertBefore(img,a); a.remove(); }
+    scheduleSyncInspector();
+  });
+}
+
+/* rich text formatting toolbar — applies inline styles to the element */
+function richTextToolbar(host, target){
+  const bar=el("div",{class:"rt-toolbar"});
+  const st=target.style;
+  const mk=(label,title,fn,active)=>{ const btn=el("button",{class:"rt-btn"+(active?" active":""),title}, label); btn.addEventListener("click",()=>{ fn(btn); scheduleSyncInspector(); }); bar.appendChild(btn); return btn; };
+  mk("B","Bold",(btn)=>{ const on=st.fontWeight==="bold"||st.fontWeight==="700"; st.fontWeight=on?"normal":"bold"; btn.classList.toggle("active",!on); }, st.fontWeight==="bold"||st.fontWeight==="700");
+  mk("I","Italic",(btn)=>{ const on=st.fontStyle==="italic"; st.fontStyle=on?"normal":"italic"; btn.classList.toggle("active",!on); }, st.fontStyle==="italic");
+  mk("U","Underline",(btn)=>{ const on=(st.textDecoration||"").includes("underline"); st.textDecoration=on?"none":"underline"; btn.classList.toggle("active",!on); }, (st.textDecoration||"").includes("underline"));
+  mk("≤","Align left",()=>{ st.textAlign="left"; });
+  mk("≡","Align center",()=>{ st.textAlign="center"; });
+  mk("≥","Align right",()=>{ st.textAlign="right"; });
+  host.appendChild(bar);
+  // font family
+  const ff=el("select");
+  const fonts=["", "Arial, Helvetica, sans-serif","Georgia, serif","'Trebuchet MS', sans-serif","Verdana, sans-serif","Tahoma, sans-serif","'Courier New', monospace"];
+  (state.style.customTokens||[]).filter(t=>t.kind==="font").forEach(t=>fonts.push(t.value));
+  fonts.forEach(f=>{ const o=el("option",{value:f}, f?f.split(",")[0].replace(/'/g,""):"(inherit font)"); if((st.fontFamily||"").replace(/"/g,"'")===f)o.setAttribute("selected",""); ff.appendChild(o); });
+  const ffWrap=el("div",{class:"field"}); ffWrap.appendChild(el("label",null,"Font")); ffWrap.appendChild(ff);
+  ff.addEventListener("change",()=>{ st.fontFamily=ff.value; scheduleSyncInspector(); });
+  host.appendChild(ffWrap);
+  // size + color
+  const sizeNow=parseInt(st.fontSize)|| "";
+  const sizeRow=el("div",{class:"row2"});
+  const sWrap=el("div",{class:"field"}); sWrap.appendChild(el("label",null,"Size (px)"));
+  const sIn=el("input",{type:"number",value:sizeNow, placeholder:"auto"}); sIn.addEventListener("input",()=>{ if(sIn.value) st.fontSize=sIn.value+"px"; else st.fontSize=""; scheduleSyncInspector(); });
+  sWrap.appendChild(sIn);
+  const cWrap=el("div",{class:"field"}); cWrap.appendChild(el("label",null,"Color"));
+  const cRow=el("div",{class:"color-row"});
+  const sw=el("input",{type:"color",class:"swatch",value:rgbToHex(st.color)||"#333333"});
+  const eye=el("button",{class:"eyedrop",title:"Pick color"},"⟡");
+  sw.addEventListener("input",()=>{ st.color=sw.value; scheduleSyncInspector(); });
+  eye.addEventListener("click",async()=>{ if(window.EyeDropper){ try{ const r=await new EyeDropper().open(); st.color=r.sRGBHex; sw.value=r.sRGBHex; scheduleSyncInspector(); }catch(e){} } else toast("EyeDropper not supported",true); });
+  cRow.appendChild(sw); cRow.appendChild(eye); cWrap.appendChild(cRow);
+  sizeRow.appendChild(sWrap); sizeRow.appendChild(cWrap); host.appendChild(sizeRow);
+}
+function rgbToHex(c){ if(!c) return null; if(/^#/.test(c)) return c; const m=c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i); if(!m) return null; return "#"+[m[1],m[2],m[3]].map(x=>(+x).toString(16).padStart(2,"0")).join(""); }
+
+/* leading-icon control for a role line */
+function lineIconControl(host, role){
+  const box=el("div",{class:"field"}); box.appendChild(el("label",null,"Leading icon (optional)"));
+  const ib=el("div",{class:"iconbox"});
+  const prev=el("div",{class:"ic-prev"+(state.lineIcons[role]?"":" empty")}, state.lineIcons[role]?`<img src="${esc(state.lineIcons[role])}">`:"—");
+  const presetSel=el("select");
+  presetSel.appendChild(el("option",{value:""},"No icon"));
+  Object.keys(LINE_ICON_SET).forEach(k=>{ const o=el("option",{value:LINE_ICON_SET[k]},"Icon: "+k); if(state.lineIcons[role]===LINE_ICON_SET[k])o.setAttribute("selected",""); presetSel.appendChild(o); });
+  presetSel.appendChild(el("option",{value:"__custom"},"Custom URL…"));
+  const urlIn=el("input",{class:"ic-url",type:"url",placeholder:"icon image URL",value:esc(state.lineIcons[role]||"")});
+  const setIcon=(u)=>{ if(u){ state.lineIcons[role]=u; prev.className="ic-prev"; prev.innerHTML=`<img src="${esc(u)}">`; } else { delete state.lineIcons[role]; prev.className="ic-prev empty"; prev.textContent="—"; } snapshot(); renderCanvas(); persist(); };
+  presetSel.addEventListener("change",()=>{ if(presetSel.value==="__custom"){ urlIn.focus(); } else { urlIn.value=presetSel.value; setIcon(presetSel.value); } });
+  urlIn.addEventListener("input",()=>setIcon(urlIn.value));
+  ib.appendChild(prev); ib.appendChild(presetSel); box.appendChild(ib); box.appendChild(urlIn); host.appendChild(box);
+}
+function sliderInline(label,id,min,max,val,unit,cb){
+  const wrap=el("div",{class:"field"}); wrap.appendChild(el("label",null,label));
+  const row=el("div",{class:"slider-row"}); const r=el("input",{type:"range",min,max,value:val}); const v=el("span",{class:"val"},val+unit);
+  r.addEventListener("input",()=>{ v.textContent=r.value+unit; cb(Number(r.value)); });
+  row.appendChild(r); row.appendChild(v); wrap.appendChild(row); return wrap;
+}
+const scheduleSyncInspector=debounce(()=>{ snapshot(); syncHtmlFromPaper(); applyProfileToDom($("#paper")); updateRawFromState(); updateHealth(); persist(); },250);
+
+/* ================================================================
+   DRAG & DROP — palette add + block reorder + resize
+   ================================================================ */
+let dragKind=null, draggedBlock=null, dropLine=null;
+
+function newBlockHtml(kind){
+  const s=S();
+  switch(kind){
+    case "text": return textBlock("block","New text goes here.");
+    case "heading": return textBlock("block","Heading", `font-family:${s.fontFamily};font-size:${s.nameSize}px;font-weight:bold;color:${s.nameColor};`);
+    case "image": return imgTag("block","https://via.placeholder.com/120x120.png?text=Image",120,"image");
+    case "button": return buttonHtml("button","Click here","#");
+    case "social": return socialRowHtml();
+    case "divider": return dividerHtml();
+    case "spacer": return spacerHtml(16);
+    case "table": return `<table data-sig-block data-sig-role="table" cellpadding="6" cellspacing="0" border="0" role="presentation" style="border-collapse:collapse;${baseTextStyle()}"><tr><td style="border:1px solid #ddd;">Cell</td><td style="border:1px solid #ddd;">Cell</td></tr><tr><td style="border:1px solid #ddd;">Cell</td><td style="border:1px solid #ddd;">Cell</td></tr></table>`;
+    case "columns": return `<table data-sig-block data-sig-role="columns" cellpadding="0" cellspacing="0" border="0" width="100%" role="presentation" style="border-collapse:collapse;"><tr><td style="vertical-align:top;padding-right:10px;width:50%;${baseTextStyle()}">Left column</td><td style="vertical-align:top;padding-left:10px;width:50%;${baseTextStyle()}">Right column</td></tr></table>`;
+    case "html": return `<div data-sig-block data-sig-role="block" style="${baseTextStyle()}"><!-- custom html -->Custom HTML block</div>`;
+  }
+  return "";
+}
+
+function setupPaletteDrag(){
+  $$(".pal-item[data-add]").forEach(item=>{
+    item.addEventListener("dragstart",ev=>{ dragKind="palette"; ev.dataTransfer.setData("text/plain", item.getAttribute("data-add")); ev.dataTransfer.effectAllowed="copy"; });
+    item.addEventListener("dragend",()=>{ dragKind=null; removeDropLine(); });
+  });
+}
+
+function onBlockDragStart(ev,b){
+  dragKind="block"; draggedBlock=b; ev.dataTransfer.effectAllowed="move";
+  try{ ev.dataTransfer.setData("text/plain","__block__"); }catch(e){}
+  setTimeout(()=>b.style.opacity="0.4",0);
+}
+function onBlockDragEnd(){ if(draggedBlock) draggedBlock.style.opacity=""; removeDropLine(); dragKind=null; }
+
+function removeDropLine(){ if(dropLine){ dropLine.remove(); dropLine=null; } }
+function showDropLineAt(target, after){
+  removeDropLine();
+  dropLine=el("div",{class:"drop-line","data-chrome":"1"});
+  if(after) target.after(dropLine); else target.before(dropLine);
+}
+
+/* find the block nearest to the cursor (any nesting level), and whether to
+   drop before or after it — enables reordering inside table columns too */
+function nearestDropTarget(paper, x, y){
+  const blocks=$$("[data-sig-block]",paper).filter(b=>b!==draggedBlock && !(draggedBlock&&draggedBlock.contains(b)));
+  let best=null, bestDist=Infinity, after=false;
+  for(const b of blocks){
+    const r=b.getBoundingClientRect();
+    if(r.width===0&&r.height===0) continue;
+    const cx=r.left+r.width/2, cy=r.top+r.height/2;
+    const d=Math.hypot(x-cx, y-cy);
+    if(d<bestDist){ bestDist=d; best=b; after=(y>cy); }
+  }
+  return best?{block:best, after}:null;
+}
+function setupCanvasDrop(){
+  const paper=$("#paper");
+  paper.addEventListener("dragover",ev=>{
+    if(dragKind!=="palette" && dragKind!=="block") return;
+    ev.preventDefault(); ev.dataTransfer.dropEffect = dragKind==="palette"?"copy":"move";
+    const t=nearestDropTarget(paper, ev.clientX, ev.clientY);
+    if(t){ showDropLineAt(t.block, t.after); }
+    else { removeDropLine(); dropLine=el("div",{class:"drop-line","data-chrome":"1"}); paper.appendChild(dropLine); }
+  });
+  paper.addEventListener("dragleave",ev=>{ if(ev.target===paper) removeDropLine(); });
+  paper.addEventListener("drop",ev=>{
+    if(dragKind!=="palette" && dragKind!=="block") return;
+    ev.preventDefault();
+    const ref=dropLine;
+    if(dragKind==="palette"){
+      const kind=ev.dataTransfer.getData("text/plain");
+      const tmp=el("div",null,newBlockHtml(kind));
+      const node=tmp.firstElementChild;
+      if(ref&&ref.parentNode){ ref.replaceWith(node); } else paper.appendChild(node);
+    } else if(dragKind==="block" && draggedBlock){
+      if(ref&&ref.parentNode){ ref.replaceWith(draggedBlock); } else paper.appendChild(draggedBlock);
+      draggedBlock.style.opacity="";
+    }
+    removeDropLine(); afterStructureChange();
+  });
+}
+
+/* ---- resize handles ---- */
+function attachResize(handle, block){
+  handle.addEventListener("mousedown",ev=>{
+    ev.preventDefault(); ev.stopPropagation();
+    const dir=handle.getAttribute("data-dir");
+    const startX=ev.clientX, startY=ev.clientY;
+    const img = block.tagName==="IMG" ? block : block.querySelector("img");
+    const startW = (img?img.offsetWidth:block.offsetWidth);
+    const startH = block.offsetHeight;
+    function mm(e){
+      let w=startW + (e.clientX-startX);
+      w=Math.max(20, Math.min(600, w));
+      if(dir.includes("e")||dir==="se"){
+        if(img){ img.setAttribute("width",Math.round(w)); img.style.width=Math.round(w)+"px"; }
+        else { block.style.width=Math.round(w)+"px"; }
       }
-    } catch (e) {}
-    // Fallback: select a rendered node and execCommand copy
-    const tmp = document.createElement("div");
-    tmp.style.position = "fixed"; tmp.style.left = "-9999px";
-    tmp.innerHTML = html;
-    document.body.appendChild(tmp);
-    const range = document.createRange();
-    range.selectNode(tmp);
-    const sel = window.getSelection();
-    sel.removeAllRanges(); sel.addRange(range);
-    try {
-      document.execCommand("copy");
-      showToast("Signature copied — paste into your email client");
-    } catch (e) {
-      showToast("Copy failed — use 'Copy HTML' instead", true);
+      if(dir.includes("s")||dir==="se"){
+        const td=block.querySelector && block.querySelector('[style*="height"]');
+      }
     }
-    sel.removeAllRanges();
-    document.body.removeChild(tmp);
-  }
+    function mu(){ document.removeEventListener("mousemove",mm); document.removeEventListener("mouseup",mu); scheduleSyncInspector(); }
+    document.addEventListener("mousemove",mm); document.addEventListener("mouseup",mu);
+  });
+}
 
-  function plainText() {
-    return [state.name, state.title, state.company, state.phone, state.mobile, state.email, state.website, state.address]
-      .filter(Boolean).join("\n");
-  }
+/* ================================================================
+   RAW HTML PANEL — two-way sync + syntax highlight
+   ================================================================ */
+let rawEditing=false;
+function updateRawFromState(){
+  if(rawEditing) return;
+  const ed=$("#rawEditor"); const code=prettyHtml(state.html);
+  ed.value=code; paintHighlight(code); $("#rawMsg").className="msg"; $("#rawMsg").textContent="In sync with design.";
+}
+function paintHighlight(code){ $("#rawHl").innerHTML=highlightHtml(code)+"\n"; }
+function highlightHtml(code){
+  // escape then colorize tags/attrs/strings/comments
+  let out=esc(code);
+  out=out.replace(/&lt;!--[\s\S]*?--&gt;/g, m=>`<span class="t-com">${m}</span>`);
+  out=out.replace(/(&lt;\/?)([a-zA-Z0-9]+)/g, (m,p1,p2)=>`${p1}<span class="t-tag">${p2}</span>`);
+  out=out.replace(/([a-zA-Z-]+)=(&quot;[^&]*?&quot;)/g, (m,a,v)=>`<span class="t-attr">${a}</span>=<span class="t-str">${v}</span>`);
+  return out;
+}
+function prettyHtml(html){
+  // lightweight pretty-print with indentation
+  if(!html) return "";
+  let formatted=""; let indent=0;
+  const tokens=html.replace(/>\s*</g,">\n<").split("\n");
+  const voidTags=/^<(img|br|hr|meta|input|link)[\s>]/i;
+  tokens.forEach(tok=>{
+    tok=tok.trim(); if(!tok) return;
+    if(/^<\//.test(tok)) indent=Math.max(0,indent-1);
+    formatted += "  ".repeat(indent)+tok+"\n";
+    if(/^<[^/!]/.test(tok) && !/\/>$/.test(tok) && !voidTags.test(tok) && !/<\/[a-z0-9]+>$/i.test(tok)) indent++;
+  });
+  return formatted.trim();
+}
 
-  async function copyHtml() {
-    const html = currentHtml();
-    try {
-      await navigator.clipboard.writeText(html);
-      showToast("HTML source copied");
-    } catch (e) {
-      $("#codeArea").focus(); $("#codeArea").select();
-      showToast("Select-all + copy from the HTML tab", true);
+const applyRaw=debounce(function(){
+  const code=$("#rawEditor").value;
+  try{
+    state.html=code.trim();
+    // raw text is authoritative: harvest values FROM the new html into the profile
+    // (don't push profile back over the user's edits)
+    harvestProfileFromDom();
+    const paper=$("#paper"); paper.innerHTML=state.html;
+    applyStyleToDom(paper); decorateBlocks(paper);
+    updateHealth(); updateConnCount(); renderFields(); renderSocials(); persist(); snapshot();
+    $("#rawMsg").className="msg ok"; $("#rawMsg").textContent="Applied to design ✓";
+  }catch(e){
+    $("#rawMsg").className="msg err"; $("#rawMsg").textContent="Parse error: "+e.message;
+  }
+},300);
+
+function setupRawPanel(){
+  const ed=$("#rawEditor");
+  ed.addEventListener("focus",()=>{ rawEditing=true; });
+  ed.addEventListener("blur",()=>{ rawEditing=false; updateRawFromState(); });
+  ed.addEventListener("input",()=>{ paintHighlight(ed.value); applyRaw(); });
+  ed.addEventListener("scroll",()=>{ $("#rawHl").scrollTop=ed.scrollTop; $("#rawHl").scrollLeft=ed.scrollLeft; });
+  $("#btnFormatHtml").addEventListener("click",()=>{ const f=prettyHtml(state.html); ed.value=f; paintHighlight(f); toast("Formatted"); });
+}
+
+/* ================================================================
+   HEALTH CHECKS (deliverability warnings)
+   ================================================================ */
+function updateHealth(){
+  const paper=$("#paper"); const warns=[];
+  const b64=$$('img[src^="data:"]',paper).length; if(b64) warns.push(b64+" embedded image"+(b64>1?"s":"")+" (may be blocked)");
+  const emptyHref=$$('a[href=""],a:not([href])',paper).length; if(emptyHref) warns.push(emptyHref+" empty link"+(emptyHref>1?"s":""));
+  const hint=$("#healthHint");
+  hint.textContent = warns.length? ("⚠ "+warns.join(" · ")) : "✓ email-safe";
+  hint.style.color = warns.length? "var(--warn)" : "var(--good)";
+}
+
+/* ================================================================
+   EXPORT — clean HTML for email
+   ================================================================ */
+function cleanExportHtml(){
+  const tmp=$("#paper").cloneNode(true);
+  stripEditorChrome(tmp);
+  // remove our data-sig-* bookkeeping for a pristine result
+  $$("*",tmp).forEach(n=>{ [...n.attributes].forEach(a=>{ if(a.name.startsWith("data-sig")) n.removeAttribute(a.name); if(a.name==="draggable") n.removeAttribute(a.name); if(a.name==="contenteditable") n.removeAttribute(a.name); }); });
+  return tmp.innerHTML.trim();
+}
+async function copySignature(){
+  const html=cleanExportHtml();
+  const plain=[state.profile.name,state.profile.title,state.profile.company,state.profile.phone,state.profile.email,state.profile.website].filter(Boolean).join("\n");
+  try{
+    if(navigator.clipboard && window.ClipboardItem){
+      await navigator.clipboard.write([new ClipboardItem({ "text/html":new Blob([html],{type:"text/html"}), "text/plain":new Blob([plain],{type:"text/plain"}) })]);
+      toast("Signature copied — paste into your email client"); return;
     }
-  }
+  }catch(e){}
+  // fallback selection copy
+  const t=el("div",{style:"position:fixed;left:-9999px;"}); t.innerHTML=html; document.body.appendChild(t);
+  const rng=document.createRange(); rng.selectNode(t); const sel=getSelection(); sel.removeAllRanges(); sel.addRange(rng);
+  try{ document.execCommand("copy"); toast("Signature copied"); }catch(e){ toast("Copy failed — use Export HTML",true); }
+  sel.removeAllRanges(); t.remove();
+}
 
-  function download() {
-    const doc = '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>' + currentHtml() + '</body></html>';
-    const blob = new Blob([doc], { type: "text/html" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "email-signature.html";
-    a.click();
-    URL.revokeObjectURL(a.href);
-    showToast("Downloaded email-signature.html");
-  }
+/* ================================================================
+   IMPORT — from clipboard (rich/plain) or file, + recognizer
+   ================================================================ */
+function openImportModal(){
+  setModal("Import signature / template", `
+    <p class="hint">Paste HTML (or a rich signature copied from an email), or load a file. We'll try to auto-recognize photo, name, links, etc. You can review and fix the connections next.</p>
+    <div class="field" style="margin-top:12px;">
+      <label>Paste HTML here</label>
+      <textarea id="impPaste" class="paste-area" placeholder="&lt;table&gt;…your signature html…&lt;/table&gt;"></textarea>
+    </div>
+    <div class="row2" style="margin-top:6px;">
+      <button class="btn secondary small" id="impFromClip">⎘ Paste from clipboard (rich)</button>
+      <button class="btn secondary small" id="impFromFile">📄 Load .html / .json file</button>
+    </div>
+    <div class="file-drop" id="impDrop" style="margin-top:10px;">Drop a .html or .json file here</div>
+    <div class="checkbox-group" style="margin-top:12px;">
+      <div class="checkrow"><input type="checkbox" id="impStyle" checked><label for="impStyle">Grab brand colors &amp; fonts into the Style menu</label></div>
+      <div class="checkrow"><input type="checkbox" id="impNormalize" checked><label for="impNormalize">Normalize tags (keep the design) <span style="color:var(--faint)">— makes role tags consistent so sections are recognized; layout is preserved</span></label></div>
+      <div class="checkrow"><input type="checkbox" id="impReview" checked><label for="impReview">Open connection review after import</label></div>
+    </div>
+    <div class="warnbox">Base64-embedded images are flagged — host images and use URLs for reliable delivery.</div>
+  `, [
+    {label:"Cancel", cls:"ghost", act:closeModal},
+    {label:"Import", cls:"", act:()=>doImportHtml($("#impPaste").value)}
+  ]);
+  $("#impFromClip").addEventListener("click",importFromClipboard);
+  $("#impFromFile").addEventListener("click",()=>pickFile(handleFile));
+  const drop=$("#impDrop");
+  drop.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("over");});
+  drop.addEventListener("dragleave",()=>drop.classList.remove("over"));
+  drop.addEventListener("drop",e=>{ e.preventDefault(); drop.classList.remove("over"); const f=e.dataTransfer.files[0]; if(f) handleFile(f); });
+  drop.addEventListener("click",()=>pickFile(handleFile));
+}
 
-  // ---------- Templates ----------
-  const TEMPLATE_DEFAULTS = {
-    classic:  { imageShape: "circle",  showDivider: true  },
-    stacked:  { imageShape: "square",  showDivider: true  },
-    divider:  { imageShape: "round",   showDivider: false },
-    logo:     { imageShape: "square",  showDivider: false }
+async function importFromClipboard(){
+  try{
+    if(navigator.clipboard && navigator.clipboard.read){
+      const items=await navigator.clipboard.read();
+      for(const it of items){
+        if(it.types.includes("text/html")){ const blob=await it.getType("text/html"); const html=await blob.text(); $("#impPaste").value=extractBody(html); toast("Pulled rich HTML from clipboard"); return; }
+      }
+      // fallback to text
+      const txt=await navigator.clipboard.readText(); $("#impPaste").value=txt; toast("Pulled text from clipboard"); return;
+    }
+    const txt=await navigator.clipboard.readText(); $("#impPaste").value=txt;
+  }catch(e){ toast("Clipboard read blocked — paste manually (Ctrl+V)", true); }
+}
+function extractBody(html){ const m=html.match(/<body[^>]*>([\s\S]*?)<\/body>/i); return (m?m[1]:html).trim(); }
+
+function doImportHtml(html){
+  if(!html || !html.trim()){ toast("Nothing to import",true); return; }
+  html=extractBody(html);
+  const doNorm=$("#impNormalize") && $("#impNormalize").checked;
+  const doReview=$("#impReview") && $("#impReview").checked;
+  const doStyle=$("#impStyle") ? $("#impStyle").checked : true;
+  // recognize roles heuristically on a detached tree
+  const tmp=document.createElement("div"); tmp.innerHTML=sanitizeImported(html);
+  markBlocks(tmp);
+  recognizeRoles(tmp);
+  // IMPORTANT: start from a BLANK profile so leftover defaults can't leak
+  // into the imported design. We only keep values we actually harvest.
+  blankProfile();
+  state.__importedSocials = state.__importedSocials || [];
+  // extract brand colors + fonts into the Style menu (before we rebuild)
+  if(doStyle){ extractStyleFromDom(tmp); }
+  if(doNorm){
+    // TAG-ONLY normalize: keep the exact design, just complete the role tags
+    $$("[data-sig-block]",tmp).forEach(n=>{ if(!n.getAttribute("data-sig-role")) n.setAttribute("data-sig-role","block"); });
+  }
+  // always preserve the pasted design verbatim (tagged with roles)
+  state.html = tmp.innerHTML.trim();
+  harvestProfileFromDom();
+  snapshot(); renderAll(); persist(); closeModal();
+  toast("Imported"+(doStyle?" · brand style grabbed":""));
+  if(doReview) openReviewModal();
+}
+
+/* pull dominant colors + primary font from imported inline styles into Style menu */
+function extractStyleFromDom(root){
+  const colorCount={}, fontCount={}; let linkColor=null, nameColor=null;
+  const bump=(map,v)=>{ if(!v) return; v=v.trim().toLowerCase(); map[v]=(map[v]||0)+1; };
+  const normColor=(c)=>{
+    if(!c) return null; c=c.trim();
+    if(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(c)) return c.toLowerCase();
+    const m=c.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if(m){ return "#"+[m[1],m[2],m[3]].map(x=>(+x).toString(16).padStart(2,"0")).join(""); }
+    return null;
   };
+  $$("*",root).forEach(n=>{
+    const st=n.getAttribute && n.getAttribute("style")||"";
+    const col=normColor((st.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i)||[])[1]);
+    const ff=(st.match(/font-family\s*:\s*([^;]+)/i)||[])[1];
+    if(col && col!=="#ffffff" && col!=="#fff") bump(colorCount,col);
+    if(ff) bump(fontCount, ff.trim());
+    const role=n.getAttribute && n.getAttribute("data-sig-role");
+    if(role==="name" && col) nameColor=col;
+    if((n.tagName==="A") && col && !isSocialHref(n.getAttribute("href"))) linkColor=linkColor||col;
+  });
+  const topColor=Object.keys(colorCount).sort((a,b)=>colorCount[b]-colorCount[a])[0];
+  const topFont=Object.keys(fontCount).sort((a,b)=>fontCount[b]-fontCount[a])[0];
+  if(topColor) state.style.textColor=topColor;
+  if(nameColor) state.style.nameColor=nameColor;
+  if(linkColor){ state.style.linkColor=linkColor; state.style.accentColor=linkColor; state.style.buttonBg=linkColor; }
+  if(topFont){ state.style.fontFamily=topFont.replace(/["']/g,"'"); 
+    // register the imported font as a selectable custom token so it stays available
+    state.style.customTokens = state.style.customTokens||[];
+    if(!state.style.customTokens.some(t=>t.kind==="font" && t.value.toLowerCase()===topFont.toLowerCase())){
+      state.style.customTokens.push({id:uid("tok"),name:"Imported font",kind:"font",value:topFont});
+    }
+  }
+}
 
-  function applyTemplate(name) {
-    state.template = name;
-    Object.assign(state, TEMPLATE_DEFAULTS[name] || {});
-    manualHtml = null;
-    save(); syncFormFromState(); render();
-    showToast("Template applied: " + name);
+/* wipe profile text/image values so the imported design shows its OWN content,
+   not editor defaults. Socials are replaced by harvested ones. */
+function blankProfile(){
+  Object.keys(state.profile).forEach(k=>{ state.profile[k]=""; });
+  state.socials=[];
+  state.customFields=[];
+}
+
+/* light sanitize: drop <script>/<style>/<head> wrappers and comments-only noise
+   that commonly ride along with pasted email HTML, without altering layout. */
+function sanitizeImported(html){
+  const d=document.createElement("div"); d.innerHTML=html;
+  d.querySelectorAll("script,style,meta,link,title,head").forEach(n=>n.remove());
+  // unwrap a single outer <html>/<body> if present
+  const body=d.querySelector("body"); if(body) return body.innerHTML.trim();
+  return d.innerHTML.trim();
+}
+
+const SOCIAL_HOSTS={linkedin:/linkedin\.com/i,twitter:/(twitter\.com|\/\/x\.com|\bx\.com)/i,github:/github\.com/i,instagram:/instagram\.com/i,facebook:/facebook\.com/i,youtube:/(youtube\.com|youtu\.be)/i};
+function isSocialHref(h){ return Object.values(SOCIAL_HOSTS).some(rx=>rx.test(h||"")); }
+
+/* Mark atomic, editable blocks WITHOUT creating giant catch-all blocks.
+   Rule: a node is a "text leaf" only if it holds text directly and does NOT
+   contain another element that itself holds visible text. Big containers
+   (a <td> wrapping several <div> lines) are therefore NEVER marked. */
+function markBlocks(root){
+  // images and links are always atomic blocks
+  Array.from(root.querySelectorAll("img,a")).forEach(n=>{ if(!n.hasAttribute("data-sig-block")) n.setAttribute("data-sig-block",""); });
+  const blockTags=["p","div","td","h1","h2","h3","h4","h5","li"];
+  const inlineTags=["span","b","strong","em","font","i","u"];
+  const textTags=blockTags.concat(inlineTags);
+  Array.from(root.querySelectorAll(textTags.join(","))).forEach(n=>{
+    if(n.hasAttribute("data-sig-block")) return;
+    if(n.closest("a")) return; // text inside a link belongs to the link
+    // does any descendant ELEMENT carry its own visible text? then n is a container
+    const hasTextyChild = Array.from(n.children).some(c=>{
+      if(c.tagName==="IMG") return false;
+      if(inlineTags.concat(["a","br"]).includes(c.tagName.toLowerCase())) return false; // inline formatting = still a leaf
+      return (c.textContent||"").trim().length>0;
+    });
+    if(hasTextyChild || directText(n).length===0) return;
+    // An INLINE element should NOT be its own leaf if it sits inside a block-level
+    // text leaf (e.g. <div><span>Dariusz</span> <span>Łacheta</span></div> -> mark
+    // the DIV, not the spans). Only mark the outermost block-level text leaf.
+    if(inlineTags.includes(n.tagName.toLowerCase())){
+      let p=n.parentElement;
+      while(p && p!==root){
+        if(blockTags.includes(p.tagName.toLowerCase()) && directText(p).length>0 && !Array.from(p.children).some(c=>blockTags.includes(c.tagName.toLowerCase()) && (c.textContent||"").trim())){
+          return; // a block-level ancestor will be the leaf; skip this inline
+        }
+        p=p.parentElement;
+      }
+    }
+    n.setAttribute("data-sig-block","");
+  });
+}
+/* visible text that belongs directly to node (inline children included) */
+function directText(n){
+  if(!n || !n.childNodes) return "";
+  let s="";
+  n.childNodes.forEach(c=>{
+    if(c.nodeType===3) s+=c.textContent;
+    else if(c.nodeType===1){
+      if(c.hasAttribute && c.hasAttribute("data-chrome")) return;      // skip editor chrome
+      const cl=typeof c.className==="string"?c.className:"";
+      if(/\b(blocktag|block-toolbar|rz-handle|sig-line-icon)\b/.test(cl)) return;
+      if(["b","strong","em","span","a","font","i","u"].includes(c.tagName.toLowerCase())) s+=directText(c); // recurse to skip nested chrome
+    }
+  });
+  return s.replace(/\s+/g," ").trim();
+}
+/* the tightest marked block that actually contains this node */
+function tightestBlock(node){
+  if(!node) return null;
+  if(node.nodeType===3) node=node.parentElement;
+  // prefer the node itself if it's a marked leaf
+  if(node.hasAttribute && node.hasAttribute("data-sig-block")) return node;
+  const inner = node.querySelector && node.querySelector("[data-sig-block]");
+  // if the clicked node wraps exactly one leaf, use that leaf
+  if(inner && node.querySelectorAll("[data-sig-block]").length===1) return inner;
+  return (node.closest && node.closest("[data-sig-block]")) || node;
+}
+
+/* heuristic recognizer — tags TIGHT leaves, never a huge container */
+function recognizeRoles(root){
+  // ---- images ----
+  const allImgs=$$("img",root);
+  const socialImgs=allImgs.filter(im=>{ const s=(im.getAttribute("src")||"")+(im.getAttribute("alt")||""); return isSocialHref(im.closest("a")?im.closest("a").getAttribute("href"):"") || /linkedin|twitter|github|instagram|facebook|youtube/i.test(s); });
+  const contentImgs=allImgs.filter(im=>!socialImgs.includes(im));
+  // signature: an image whose src/alt mentions "sign", OR a wide short image near the top before the photo
+  const sigImg=contentImgs.find(im=>/signature|signoff|sign-/i.test((im.getAttribute("src")||"")+(im.getAttribute("alt")||"")));
+  if(sigImg) sigImg.setAttribute("data-sig-role","signature");
+  const remaining=contentImgs.filter(im=>im!==sigImg);
+  if(remaining[0]) remaining[0].setAttribute("data-sig-role","photo");
+  if(remaining.length>1){ const last=remaining[remaining.length-1]; const w=parseInt(last.getAttribute("width"))||0; last.setAttribute("data-sig-role", w>280?"banner":"logo"); }
+
+  // ---- social links: collect for the sidebar ----
+  const found=[];
+  $$("a",root).forEach(a=>{ const h=a.getAttribute("href")||""; for(const k in SOCIAL_HOSTS){ if(SOCIAL_HOSTS[k].test(h)){ found.push({type:k,url:h}); break; } } });
+  state.__importedSocials = found;
+
+  // ---- email / phone / website: tag the tight block around each anchor ----
+  $$("a",root).forEach(a=>{
+    const h=a.getAttribute("href")||"";
+    if(isSocialHref(h)) return;
+    const holder = a.hasAttribute("data-sig-block") ? a : (tightestBlock(a) || a);
+    if(/^mailto:/i.test(h)){ if(!holder.getAttribute("data-sig-role")) holder.setAttribute("data-sig-role","email"); }
+    else if(/^tel:/i.test(h)){ if(!holder.getAttribute("data-sig-role")) holder.setAttribute("data-sig-role","phone"); }
+    else if(/^https?:/i.test(h) && !holder.getAttribute("data-sig-role")) holder.setAttribute("data-sig-role","website");
+  });
+
+  // ---- text-pattern pass over leaves: name, title, company, phone, email, address ----
+  const leaves=$$("[data-sig-block]",root).filter(n=>n.tagName!=="IMG" && n.tagName!=="A" && directText(n));
+  // name first (tight bold/heading or first leaf)
+  const nameEl=pickNameElement(root, leaves);
+  if(nameEl && !nameEl.getAttribute("data-sig-role")) nameEl.setAttribute("data-sig-role","name");
+
+  const isContact = (t)=> /@/.test(t) || /https?:|www\./i.test(t) || /^[\s(+]*\d[\d\s()\-./]{5,}\d\s*$/.test(t);
+  const looksLikeNameWord = (t)=> /^[\p{Lu}][\p{L}'’.-]*$/u.test(t.trim()); // single capitalized word (Łacheta)
+
+  leaves.forEach((n)=>{
+    if(n.getAttribute("data-sig-role")) return;
+    const t=directText(n); if(!t) return;
+    if(/^[\s(+]*\d[\d\s()\-./]{6,}\d$/.test(t)){ n.setAttribute("data-sig-role","phone"); return; }
+    if(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i.test(t) && t.length<80){ n.setAttribute("data-sig-role","email"); return; }
+    if(/\b(www\.|https?:\/\/)\S+/i.test(t) && t.length<80){ n.setAttribute("data-sig-role","website"); return; }
+  });
+
+  // title/company: look at the leaves AFTER the name — but first, if the name
+  // is a single word and the next leaf is also a single capitalized word (the
+  // surname split across elements), DON'T treat the surname as title/company.
+  const nameIdx = leaves.indexOf(nameEl);
+  if(nameIdx>=0){
+    let cursor=nameIdx+1;
+    // skip a surname-continuation leaf (single capitalized word right after a 1-word name)
+    const nameText=directText(nameEl);
+    if(nameText && nameText.split(/\s+/).length===1){
+      const nxt=leaves[cursor];
+      if(nxt && !nxt.getAttribute("data-sig-role")){
+        const nt=directText(nxt);
+        if(nt && looksLikeNameWord(nt) && !isContact(nt)){ /* leave it unroled; it's part of the name visually */ cursor++; }
+      }
+    }
+    // now assign up to 2 descriptive lines as title then company
+    let assigned=0;
+    for(let i=cursor; i<leaves.length && assigned<2; i++){
+      const n=leaves[i]; if(n.getAttribute("data-sig-role")) continue;
+      const t=directText(n); if(!t) break;
+      if(isContact(t)) break;                         // stop at contact info
+      if(looksLikeNameWord(t) && t.length<24 && assigned===0){ /* still ambiguous single word — could be a 1-word title like a role; allow */ }
+      n.setAttribute("data-sig-role", assigned===0?"title":"company");
+      assigned++;
+    }
   }
 
-  // ---------- Tabs ----------
-  function setupTabs() {
-    $$(".tab").forEach(tab => {
-      tab.addEventListener("click", () => {
-        $$(".tab").forEach(t => t.classList.remove("active"));
-        $$(".tab-pane").forEach(p => p.classList.remove("active"));
-        tab.classList.add("active");
-        $('[data-pane="' + tab.getAttribute("data-tab") + '"]').classList.add("active");
-      });
-    });
+  // address: last unclaimed plain leaf that looks location-ish
+  const addrCand=leaves.slice().reverse().find(n=>!n.getAttribute("data-sig-role") && /[A-Za-z].*,.*[A-Za-z]|\b(poland|usa|uk|street|st\.|ave|road)\b/i.test(directText(n)) && directText(n).length<80);
+  if(addrCand) addrCand.setAttribute("data-sig-role","address");
+}
+
+/* choose a tight element that looks like the person's name.
+   Prefer a bold/heading leaf whose text is a full name (2+ words). If the only
+   bold leaf is a single word (name split across elements), prefer the nearest
+   ancestor leaf that holds the FULL name text. */
+function pickNameElement(root, leaves){
+  leaves=leaves||$$("[data-sig-block]",root).filter(n=>n.tagName!=="IMG" && n.tagName!=="A" && directText(n));
+  const bold=$$("h1,h2,h3,b,strong",root)
+    .map(e=> e.hasAttribute("data-sig-block") ? e : (tightestBlock(e)||e))
+    .filter(e=>{ const t=directText(e); return t && t.length<=60 && !/@|https?:|\+?\d{6,}/.test(t); });
+  // 1) a bold leaf that already contains a full multi-word name
+  const full=bold.find(e=>{ const t=directText(e); return t.trim().split(/\s+/).length>=2; });
+  if(full) return full;
+  // 2) a bold single word -> try to climb to a leaf that holds the whole name line
+  if(bold[0]){
+    const b=bold[0];
+    // climb to the nearest block whose directText has 2+ words and isn't contact info
+    let anc=b;
+    while(anc && anc!==root){
+      const t=directText(anc);
+      if(t && t.trim().split(/\s+/).length>=2 && !/@|https?:|\+?\d{6,}/.test(t)){ return anc.hasAttribute&&anc.hasAttribute("data-sig-block")?anc:(tightestBlock(anc)||b); }
+      anc=anc.parentElement;
+    }
+    return b;
   }
+  // 3) fallback: first text leaf
+  return leaves[0]||null;
+}
 
-  // ---------- Events ----------
-  function setup() {
-    syncFormFromState();
-    setupTabs();
-    render();
-
-    document.addEventListener("input", e => {
-      if (e.target.matches("[data-field]")) onFieldInput(e);
-      else if (e.target.matches("[data-color]")) onColorInput(e);
-    });
-
-    $("#btnAddLink").addEventListener("click", () => {
-      state.links = state.links || [];
-      state.links.push({ type: "linkedin", url: "" });
-      save(); renderLinks(); render();
-    });
-
-    $$(".template-card").forEach(c =>
-      c.addEventListener("click", () => applyTemplate(c.getAttribute("data-template"))));
-
-    $("#imageUpload").addEventListener("change", e => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        state.imageUrl = reader.result;
-        $('[data-field="imageUrl"]').value = "(embedded upload)";
-        manualHtml = null; save(); render();
-        showToast("Image embedded — remember hosting is more reliable");
-      };
-      reader.readAsDataURL(file);
-    });
-
-    $("#btnApplyCode").addEventListener("click", () => {
-      manualHtml = $("#codeArea").value;
-      render();
-      $("#previewContent").innerHTML = manualHtml; // honor manual edits exactly
-      showToast("Applied custom HTML");
-    });
-    $("#btnRegen").addEventListener("click", () => {
-      manualHtml = null; render(); showToast("Regenerated from form");
-    });
-
-    $("#btnCopy").addEventListener("click", copyRich);
-    $("#btnCopyTop").addEventListener("click", copyRich);
-    $("#btnCopyHtml").addEventListener("click", copyHtml);
-    $("#btnDownload").addEventListener("click", download);
-
-    $("#btnReset").addEventListener("click", () => {
-      if (!confirm("Reset everything to defaults?")) return;
-      state = JSON.parse(JSON.stringify(DEFAULT));
-      manualHtml = null; save(); syncFormFromState(); render();
-      showToast("Reset to defaults");
-    });
-
-    $$(".pill[data-device]").forEach(p => p.addEventListener("click", () => {
-      $$(".pill[data-device]").forEach(x => x.classList.remove("active"));
-      p.classList.add("active");
-      $("#previewFrame").classList.toggle("mobile", p.getAttribute("data-device") === "mobile");
-    }));
-
-    $("#bgToggle").addEventListener("click", () => {
-      const frame = $("#previewFrame");
-      const dark = frame.style.background === "rgb(45, 45, 60)";
-      frame.style.background = dark ? "#ffffff" : "#2d2d3c";
-      $("#bgToggle").textContent = dark ? "◻️ Light bg" : "◼️ Dark bg";
-    });
+function harvestProfileFromDom(){
+  const paper=document.createElement("div"); paper.innerHTML=state.html;
+  ROLES.forEach(r=>{
+    const n=paper.querySelector(`[data-sig-role="${r.key}"]`); if(!n) return;
+    if(r.type==="image"){ const img=n.tagName==="IMG"?n:n.querySelector("img"); if(img){ const v=img.getAttribute("src"); if(v) state.profile[r.key]=v; } }
+    else { const v=directText(n)||((n.textContent||"").trim()); if(v) state.profile[r.key]=v; }
+  });
+  if(state.__importedSocials && state.__importedSocials.length){
+    state.socials = state.__importedSocials.map(s=>({id:uid("s"),type:s.type,url:s.url}));
   }
+  state.__importedSocials = [];
+}
 
-  document.addEventListener("DOMContentLoaded", setup);
+/* ================================================================
+   NORMALIZE — rewrite to canonical structure
+   ================================================================ */
+function normalizeStructure(root){
+  // Rebuild a clean standard layout using ONLY recognized values (no defaults).
+  const get=(key,attr)=>{ const n=root.querySelector(`[data-sig-role="${key}"]`); if(!n) return ""; if(attr==="src"){ const img=n.tagName==="IMG"?n:n.querySelector("img"); return img?(img.getAttribute("src")||""):""; } return directText(n)||((n.textContent||"").trim()); };
+  // harvest recognized values into a fresh profile (don't keep defaults)
+  blankProfile();
+  state.profile.photo=get("photo","src");
+  state.profile.logo=get("logo","src");
+  state.profile.signature=get("signature","src");
+  state.profile.banner=get("banner","src");
+  // Fallback: if nothing was tagged "photo" but there ARE content images, use the first.
+  if(!state.profile.photo){
+    const anyImg=$$("img",root).find(im=>{ const h=im.closest("a")?im.closest("a").getAttribute("href"):""; return !isSocialHref(h) && (im.getAttribute("src")||"") && !/\.svg($|\?)/i.test(im.getAttribute("src")||""); });
+    if(anyImg) state.profile.photo=anyImg.getAttribute("src")||"";
+  }
+  ["name","title","company","tagline","phone","mobile","email","website","address","disclaimer"].forEach(k=>{ state.profile[k]=get(k); });
+  // harvested socials (set earlier by recognizeRoles)
+  if(state.__importedSocials && state.__importedSocials.length){
+    state.socials = state.__importedSocials.map(s=>({id:uid("s"),type:s.type,url:s.url}));
+  }
+  // pick a sensible starter: photo present -> classic, else stacked
+  const html = state.profile.photo ? STARTERS.classic() : STARTERS.stacked();
+  return html;
+}
+function normalizeInPlace(){
+  const tmp=document.createElement("div"); tmp.innerHTML=state.html; markBlocks(tmp); recognizeRoles(tmp);
+  state.html=normalizeStructure(tmp); snapshot(); renderAll(); persist(); toast("Normalized to standard structure");
+}
+
+/* TAG-ONLY normalize: keep the EXACT design, only make the role tags /
+   data-sig-block markers consistent and complete in place. This is what the
+   user wants — "normalize tags & internal names, but the design stays". */
+function normalizeTagsInPlace(){
+  const tmp=document.createElement("div"); tmp.innerHTML=state.html;
+  // clear any stale markers/roles, then re-mark + re-recognize cleanly
+  $$("[data-sig-block]",tmp).forEach(n=>{ n.removeAttribute("data-sig-block"); n.removeAttribute("data-sig-role"); });
+  markBlocks(tmp);
+  recognizeRoles(tmp);
+  // ensure every marked block has a role (unknown -> "block") so structure is complete
+  $$("[data-sig-block]",tmp).forEach(n=>{ if(!n.getAttribute("data-sig-role")) n.setAttribute("data-sig-role","block"); });
+  state.html=tmp.innerHTML.trim();
+  harvestProfileFromDom();
+  snapshot(); renderAll(); persist();
+  toast("Tags normalized — design kept, roles made consistent");
+}
+
+/* ================================================================
+   CONNECTION REVIEW modal (side-by-side)
+   ================================================================ */
+let reviewFilter="all"; let reviewConnectKey=null; let showAllLabels=false;
+
+/* draw a persistent small label on EVERY connected element in the review preview */
+function clearReviewAllLabels(){ const prev=$("#rvPreview"); if(prev){ $$(".rv-alllabel",prev).forEach(n=>n.remove()); $$(".rv-alloutline",prev).forEach(n=>n.classList.remove("rv-alloutline")); } }
+function paintReviewAllLabels(){
+  const prev=$("#rvPreview"); if(!prev) return;
+  clearReviewAllLabels();
+  const pr=prev.getBoundingClientRect();
+  $$("[data-sig-role]",prev).forEach(node=>{
+    const role=node.getAttribute("data-sig-role");
+    const def=ROLE_BY_KEY[role] || (state.customFields||[]).find(f=>f.key===role) ||
+      (/__icon$/.test(role) && {label:(ROLE_BY_KEY[role.replace(/__icon$/,"")]||{}).label ? (ROLE_BY_KEY[role.replace(/__icon$/,"")].label+" icon") : role});
+    if(!def) return;
+    node.classList.add("rv-alloutline");           // outline the element lightly
+    const tr=node.getBoundingClientRect();
+    const isIcon=/__icon$/.test(role) || (node.tagName==="IMG" && tr.width && tr.width<=40);
+    const lbl=el("div",{class:"rv-alllabel"+(isIcon?" tiny":"")}, (def.label||role));
+    lbl.style.left=Math.max(0,(tr.left-pr.left+prev.scrollLeft))+"px";
+    lbl.style.top=Math.max(0,(tr.top-pr.top+prev.scrollTop-13))+"px";
+    prev.appendChild(lbl);
+  });
+}
+function openReviewModal(){
+  const defs=allFieldDefs();
+  setModal("Connection review", `
+    <p class="hint">Hover a field <b>or</b> an element in the design to see its match outlined. To wire an unconnected field: click <b>Connect</b>, then click the matching element in the design — <b>or drag the element onto the field</b>.</p>
+    <div class="rv-filter" id="rvFilter">
+      <span class="rv-chip active" data-f="all">All</span>
+      <span class="rv-chip" data-f="connected">● Connected</span>
+      <span class="rv-chip" data-f="unlinked">○ Not connected</span>
+    </div>
+    <div class="review-grid" style="margin-top:10px;">
+      <div class="review-col"><h4>Fields</h4><div class="review-fields" id="rvFields"></div>
+        <h4 style="margin-top:14px;">Social links</h4><div id="rvSocials"></div></div>
+      <div class="review-col"><h4 style="display:flex;align-items:center;gap:8px;">Design <span class="rv-chip" id="rvShowAll" style="margin-left:auto;">🏷 Show all labels</span></h4><div class="review-preview" id="rvPreview"></div></div>
+    </div>
+  `, [ {label:"Normalize now", cls:"ghost", act:()=>{ normalizeInPlace(); closeModal(); }}, {label:"Done", cls:"", act:closeModal} ]);
+  const prev=$("#rvPreview"); prev.innerHTML=cleanExportButKeepRoles();
+  // exactly ONE floating label inside the (positioned) preview
+  prev.appendChild(el("div",{class:"rv-boxlabel",id:"rvBoxLabel"}));
+  renderReviewFields();
+  renderReviewSocials();
+  if(showAllLabels){ $("#rvShowAll").classList.add("active"); paintReviewAllLabels(); }
+  $("#rvShowAll").addEventListener("click",()=>{ showAllLabels=!showAllLabels; $("#rvShowAll").classList.toggle("active",showAllLabels); if(showAllLabels) paintReviewAllLabels(); else clearReviewAllLabels(); });
+  // repaint persistent labels on scroll (positions are absolute within preview)
+  prev.addEventListener("scroll",()=>{ if(showAllLabels) paintReviewAllLabels(); });
+  // filter chips
+  $$("#rvFilter .rv-chip").forEach(c=>c.addEventListener("click",()=>{ reviewFilter=c.getAttribute("data-f"); $$("#rvFilter .rv-chip").forEach(x=>x.classList.toggle("active",x===c)); renderReviewFields(); }));
+  // DESIGN -> FIELD hover: outline hovered element + light up its field, with a label box
+  prev.addEventListener("mousemove", onReviewPreviewHover);
+  prev.addEventListener("mouseleave", clearReviewHover);
+  // never follow links in the review preview
+  prev.addEventListener("click", e=>{ const a=e.target.closest && e.target.closest("a"); if(a) e.preventDefault(); }, true);
+}
+function renderReviewFields(){
+  const prev=$("#rvPreview"); const fields=$("#rvFields"); if(!fields) return;
+  fields.innerHTML="";
+  allFieldDefs().forEach(d=>{
+    const group=el("div",{class:"cgroup"});
+    group.appendChild(buildReviewRow(d, false, prev));
+    if(d.type!=="image" && roleCanHaveIcon(d.key, d.custom)){
+      group.appendChild(buildReviewRow(d, true, prev));
+    }
+    fields.appendChild(group);
+  });
+  enableReviewDragSources();
+}
+/* one review row — text row (isIcon=false) or paired icon row (isIcon=true) */
+function buildReviewRow(d, isIcon, prev){
+  const roleKey=isIcon? d.key+"__icon" : d.key;
+  const label=isIcon? (d.label+" icon") : d.label;
+  const target=prev.querySelector(`[data-sig-role="${roleKey}"]`);
+  const bound=!!target;
+  const row=el("div",{class:"cfield compact"+(bound?" connected":"")+(isIcon?" iconsub":""), "data-role":roleKey});
+  const head=el("div",{class:"chead"});
+  head.appendChild(el("span",{class:"status"}));
+  head.appendChild(el("span",{class:"clabel"}, (isIcon?"⬙ ":"")+label));
+  head.appendChild(el("span",{class:"cbind"+(bound?"":" unbound")}, bound?"linked":"not linked"));
+  const btn=el("button",{class:"btn ghost small", style:"flex:0 0 auto;"}, bound?"Re-connect":"Connect");
+  btn.addEventListener("click",()=>startReviewConnect(roleKey, btn));
+  head.appendChild(btn);
+  if(bound){
+    const un=el("button",{class:"btn ghost small",title:"Disconnect",style:"flex:0 0 auto;color:var(--danger);border-color:var(--danger);"},"⦸");
+    un.addEventListener("click",()=>unlinkRoleInReview(roleKey));
+    head.appendChild(un);
+  }
+  row.appendChild(head);
+  row.addEventListener("mouseenter",()=>{ const t=prev.querySelector(`[data-sig-role="${roleKey}"]`); if(t){ t.classList.add("rv-mark"); showReviewBox(t, label, true);} });
+  row.addEventListener("mouseleave",()=>{ const t=prev.querySelector(`[data-sig-role="${roleKey}"]`); if(t)t.classList.remove("rv-mark"); hideReviewBox(); });
+  row.addEventListener("dragover",ev=>{ ev.preventDefault(); row.classList.add("droptarget"); });
+  row.addEventListener("dragleave",()=>row.classList.remove("droptarget"));
+  row.addEventListener("drop",ev=>{ ev.preventDefault(); row.classList.remove("droptarget"); if(reviewDragEl){ assignRoleInPreview(roleKey, reviewDragEl); } });
+  return row;
+}
+/* social links in the review: type, url, icon preview + drag-an-icon-to-connect */
+function renderReviewSocials(){
+  const host=$("#rvSocials"); if(!host) return; host.innerHTML="";
+  if(!(state.socials||[]).length){ host.appendChild(el("p",{class:"hint"},"No social links detected.")); return; }
+  state.socials.forEach(l=>{
+    const wrap=el("div",{class:"iconbox",style:"flex-wrap:wrap;margin-bottom:8px;"});
+    const iconUrl=socialIconFor(l);
+    const prev=el("div",{class:"ic-prev"+(iconUrl?"":" empty")}, iconUrl?`<img src="${esc(iconUrl)}">`:"?");
+    const sel=el("select",{style:"flex:0 0 92px;"});
+    Object.keys(SOCIAL_TYPES).concat(["custom"]).forEach(t=>{ const o=el("option",{value:t}, t==="custom"?"Custom":SOCIAL_TYPES[t].label); if(t===l.type)o.setAttribute("selected",""); sel.appendChild(o); });
+    sel.value=l.type;
+    const url=el("input",{class:"ic-url",type:"text",placeholder:"URL",value:esc(l.url||"")});
+    const refresh=()=>{ const u=socialIconFor(l); prev.className="ic-prev"+(u?"":" empty"); prev.innerHTML=u?`<img src="${esc(u)}">`:"?"; };
+    sel.addEventListener("change",()=>{ l.type=sel.value; if(l.type!=="custom") delete l.icon; refresh(); snapshot(); renderCanvas(); persist(); });
+    url.addEventListener("input",()=>{ l.url=url.value; snapshot(); renderCanvas(); persist(); });
+    wrap.appendChild(prev); wrap.appendChild(sel); wrap.appendChild(url);
+    const ci=el("input",{type:"url",placeholder:"icon image URL — or drag an icon here",value:esc(l.icon||""),style:"flex-basis:100%;margin-top:6px;"});
+    ci.addEventListener("input",()=>{ l.icon=ci.value; refresh(); snapshot(); renderCanvas(); persist(); });
+    wrap.appendChild(ci);
+    wrap.addEventListener("dragover",ev=>{ if(reviewDragEl||draggedBlock){ ev.preventDefault(); wrap.classList.add("droptarget"); } });
+    wrap.addEventListener("dragleave",()=>wrap.classList.remove("droptarget"));
+    wrap.addEventListener("drop",ev=>{ ev.preventDefault(); wrap.classList.remove("droptarget"); const src=iconSrcFromDraggedEl(); if(src){ l.icon=src; ci.value=src; refresh(); snapshot(); renderCanvas(); persist(); toast("Icon linked"); } });
+    host.appendChild(wrap);
+  });
+}
+
+let reviewDragEl=null;
+function enableReviewDragSources(){
+  const prev=$("#rvPreview"); if(!prev) return;
+  $$("[data-sig-block], img, a", prev).forEach(n=>{
+    n.setAttribute("draggable","true");
+    n.ondragstart=(ev)=>{ reviewDragEl=tightestBlock(n); try{ev.dataTransfer.setData("text/plain","el");}catch(e){} };
+    n.ondragend=()=>{ reviewDragEl=null; };
+  });
+}
+
+function onReviewPreviewHover(ev){
+  const prev=$("#rvPreview"); if(!prev) return;
+  const el2=tightestBlock(ev.target);
+  // always clear previous marks first so nothing sticks
+  $$(".rv-hover,.rv-mark",prev).forEach(n=>n.classList.remove("rv-hover","rv-mark"));
+  if(!el2 || el2===prev || el2.id==="rvBoxLabel"){ hideReviewBox(); $$("#rvFields .cfield").forEach(f=>f.classList.remove("highlight")); return; }
+  el2.classList.add("rv-hover");
+  const role=el2.getAttribute && el2.getAttribute("data-sig-role");
+  const def=role && (ROLE_BY_KEY[role] || (state.customFields||[]).find(f=>f.key===role));
+  showReviewBox(el2, def ? ("● "+def.label) : "○ not connected", !!def);
+  $$("#rvFields .cfield").forEach(f=>f.classList.toggle("highlight", role && f.getAttribute("data-role")===role));
+}
+function clearReviewHover(){
+  const prev=$("#rvPreview"); if(prev) $$(".rv-hover,.rv-mark",prev).forEach(n=>n.classList.remove("rv-hover","rv-mark"));
+  $$("#rvFields .cfield").forEach(f=>f.classList.remove("highlight"));
+  hideReviewBox();
+}
+function showReviewBox(target, label, ok){
+  const box=$("#rvBoxLabel"); const prev=$("#rvPreview"); if(!box||!prev||!target) return;
+  const pr=prev.getBoundingClientRect(); const tr=target.getBoundingClientRect();
+  // offsets relative to the (positioned) preview's content, accounting for scroll
+  const top = tr.top - pr.top + prev.scrollTop;
+  const left = tr.left - pr.left + prev.scrollLeft;
+  box.textContent=label; box.className="rv-boxlabel show "+(ok?"ok":"warn");
+  box.style.left=Math.max(0,left)+"px";
+  box.style.top=Math.max(0,top-16)+"px";
+}
+function hideReviewBox(){ const box=$("#rvBoxLabel"); if(box) box.className="rv-boxlabel"; }
+
+function cleanExportButKeepRoles(){ const t=$("#paper").cloneNode(true); stripEditorChrome(t); return t.innerHTML; }
+
+function startReviewConnect(key, btn){
+  reviewConnectKey=key; if(btn) btn.textContent="Click an element…";
+  const prev=$("#rvPreview");
+  const handler=(ev)=>{
+    const b=tightestBlock(ev.target); if(!b || b===prev) return;
+    ev.preventDefault(); ev.stopPropagation();
+    assignRoleInPreview(key, b);
+    prev.removeEventListener("click",handler,true);
+  };
+  prev.addEventListener("click",handler,true);
+}
+/* capture the preview's signature HTML WITHOUT the editor-only label/marks */
+function previewCleanHtml(prev){
+  const c=prev.cloneNode(true);
+  c.querySelectorAll("#rvBoxLabel,.rv-boxlabel").forEach(n=>n.remove());
+  c.querySelectorAll(".rv-hover,.rv-mark").forEach(n=>n.classList.remove("rv-hover","rv-mark"));
+  return c.innerHTML;
+}
+/* remove a role binding from inside the review preview */
+function unlinkRoleInReview(key){
+  const prev=$("#rvPreview");
+  prev.querySelectorAll(`[data-sig-role="${key}"]`).forEach(n=>n.removeAttribute("data-sig-role"));
+  state.html=previewCleanHtml(prev);
+  // clear the now-unbound field value so it shows empty/not-linked
+  if(key in state.profile) state.profile[key]="";
+  const cf=(state.customFields||[]).find(f=>f.key===key); if(cf) cf.value="";
+  harvestProfileFromDom(); renderAll(); persist();
+  refreshReview();
+  const def=ROLE_BY_KEY[key]||(state.customFields||[]).find(f=>f.key===key);
+  toast("Disconnected "+(def?def.label:key));
+}
+
+/* set a role on a preview element, adopt the edits, refresh everything */
+function assignRoleInPreview(key, elTight){
+  const prev=$("#rvPreview");
+  prev.querySelectorAll(`[data-sig-role="${key}"]`).forEach(n=>{ if(n!==elTight) n.removeAttribute("data-sig-role"); });
+  elTight.setAttribute("data-sig-role",key);
+  state.html=previewCleanHtml(prev);
+  harvestProfileFromDom(); renderAll(); persist();
+  reviewConnectKey=null;
+  refreshReview();
+  const def=ROLE_BY_KEY[key]||(state.customFields||[]).find(f=>f.key===key);
+  toast("Connected "+(def?def.label:key));
+}
+
+/* refresh the review in place WITHOUT losing scroll position (no modal rebuild) */
+function refreshReview(){
+  const fieldsWrap=$("#rvFields"); const prev=$("#rvPreview");
+  if(!fieldsWrap || !prev){ openReviewModal(); return; }
+  const fScroll = fieldsWrap.scrollTop, pScroll = prev.scrollTop;
+  // rebuild the design preview (adopts latest roles) and re-add the floating label
+  prev.innerHTML=cleanExportButKeepRoles();
+  prev.appendChild(el("div",{class:"rv-boxlabel",id:"rvBoxLabel"}));
+  if(showAllLabels) paintReviewAllLabels();
+  renderReviewFields();
+  renderReviewSocials();
+  // restore scroll positions
+  fieldsWrap.scrollTop=fScroll; prev.scrollTop=pScroll;
+}
+
+/* in-canvas connect mode (from banner / field link button) */
+const connectMode={active:false,key:null};
+function completeConnect(block){
+  if(!connectMode.active) return;
+  const key=connectMode.key;
+  connectMode.active=false; connectMode.key=null;
+  $("#connectBanner").classList.remove("show");
+  connectRoleToBlock(key, block);
+}
+
+/* normalize choice modal: tag-only (keep design) vs full rebuild */
+function openNormalizeModal(){
+  setModal("Normalize structure", `
+    <p class="hint">Two ways to clean up the structure:</p>
+    <div class="checkbox-group" style="margin-top:12px;gap:10px;">
+      <button class="btn secondary" id="nmTags" style="text-align:left;padding:12px;">
+        <b>Normalize tags only (keep the design)</b><br>
+        <span style="color:var(--faint);font-weight:400;">Your layout stays exactly as-is. Only the role tags &amp; internal names are made consistent and complete, so the editor recognizes every section. Recommended.</span>
+      </button>
+      <button class="btn secondary" id="nmFull" style="text-align:left;padding:12px;">
+        <b>Rebuild to standard layout</b><br>
+        <span style="color:var(--faint);font-weight:400;">Recreates a clean classic/stacked layout from the detected values. Changes the look — use only if you want to start from a tidy template.</span>
+      </button>
+    </div>
+  `, [ {label:"Cancel", cls:"ghost", act:closeModal} ]);
+  $("#nmTags").addEventListener("click",()=>{ closeModal(); normalizeTagsInPlace(); });
+  $("#nmFull").addEventListener("click",()=>{ if(confirm("Rebuild will change the layout. Continue?")){ closeModal(); normalizeInPlace(); } });
+}
+
+/* ================================================================
+   RESET — clear autosave / session / everything
+   ================================================================ */
+function openResetModal(){
+  setModal("Reset / clear memory", `
+    <p class="hint">Old autosaved sessions can conflict with newer versions. Pick what to clear — this cannot be undone.</p>
+    <div class="checkbox-group" style="margin-top:12px;gap:10px;">
+      <button class="btn secondary" id="rsSession" style="text-align:left;padding:12px;">
+        <b>Start a fresh signature</b><br>
+        <span style="color:var(--faint);font-weight:400;">Clears the current autosave and loads the default starter. Keeps your saved templates.</span>
+      </button>
+      <button class="btn secondary" id="rsAll" style="text-align:left;padding:12px;color:#f0a;border-color:var(--danger);">
+        <b style="color:var(--danger)">Clear EVERYTHING (hard reset)</b><br>
+        <span style="color:var(--faint);font-weight:400;">Wipes autosave, saved templates, panel sizes and all editor memory from this browser. Full clean slate.</span>
+      </button>
+    </div>
+  `, [ {label:"Cancel", cls:"ghost", act:closeModal} ]);
+  $("#rsSession").addEventListener("click",()=>{ if(confirm("Clear current autosave and start fresh? (saved templates kept)")){ resetSession(false); closeModal(); } });
+  $("#rsAll").addEventListener("click",()=>{ if(confirm("Hard reset — wipe ALL editor memory in this browser?")){ resetSession(true); closeModal(); } });
+}
+function resetSession(hard){
+  try{
+    localStorage.removeItem(LS_KEY);
+    localStorage.removeItem("sig-panels");
+    if(hard){ localStorage.removeItem(LS_TPL); }
+  }catch(e){}
+  // reset in-memory state to defaults
+  state.profile=deepClone(DEFAULT_PROFILE);
+  state.socials=deepClone(DEFAULT_SOCIALS);
+  state.style=deepClone(DEFAULT_STYLE);
+  state.customFields=[]; state.lineIcons={};
+  state.html=""; state.bg="light"; state.device="desktop";
+  state.showLabels=false; state.showBoxes=false;
+  history.stack=[]; history.index=-1;
+  renderAll(); applyDeviceBg(); snapshot(); updateUndoButtons();
+  toast(hard?"Everything cleared — clean slate":"Fresh signature started");
+}
+
+/* ================================================================
+   SAVE / EXPORT modal (granular)
+   ================================================================ */
+function openSaveModal(){
+  setModal("Save / Export", `
+    <p class="hint">Export standardized JSON you can re-import in parts — e.g. import only the style into another signature, or only your user info.</p>
+    <div class="checkbox-group" style="margin-top:12px;">
+      <h4 style="margin:4px 0;color:var(--muted);font-size:12px;">Export JSON</h4>
+      <button class="btn secondary small" data-exp="full">⬇ Full signature (everything)</button>
+      <button class="btn secondary small" data-exp="style">⬇ Style only</button>
+      <button class="btn secondary small" data-exp="profile">⬇ User info / profile only</button>
+      <button class="btn secondary small" data-exp="template">⬇ Template (layout + style)</button>
+      <h4 style="margin:10px 0 4px;color:var(--muted);font-size:12px;">Export HTML</h4>
+      <button class="btn secondary small" data-exp="html">⬇ Clean email HTML (.html)</button>
+      <button class="btn secondary small" data-exp="copyhtml">⎘ Copy clean HTML to clipboard</button>
+    </div>
+  `, [ {label:"Close", cls:"ghost", act:closeModal} ]);
+  $$("#modalBody [data-exp]").forEach(b=>b.addEventListener("click",()=>exportAs(b.getAttribute("data-exp"))));
+}
+function download(name, text, type){
+  const blob=new Blob([text],{type:type||"application/json"}); const a=el("a",{href:URL.createObjectURL(blob),download:name}); a.click(); URL.revokeObjectURL(a.href);
+}
+function exportAs(kind){
+  const meta={ __sig:true, version:2, kind };
+  if(kind==="full"){ download("signature-full.json", JSON.stringify(Object.assign(meta,{ profile:state.profile, socials:state.socials, style:state.style, html:state.html, customFields:state.customFields }),null,2)); }
+  else if(kind==="style"){ download("signature-style.json", JSON.stringify(Object.assign(meta,{ style:state.style }),null,2)); }
+  else if(kind==="profile"){ download("signature-profile.json", JSON.stringify(Object.assign(meta,{ profile:state.profile, socials:state.socials, customFields:state.customFields }),null,2)); }
+  else if(kind==="template"){ download("signature-template.json", JSON.stringify(Object.assign(meta,{ html:state.html, style:state.style }),null,2)); }
+  else if(kind==="html"){ download("signature.html", "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body>"+cleanExportHtml()+"</body></html>","text/html"); }
+  else if(kind==="copyhtml"){ navigator.clipboard && navigator.clipboard.writeText(cleanExportHtml()); toast("Clean HTML copied"); return; }
+  toast("Exported "+kind);
+}
+
+/* import a .json (any subset) or .html file */
+function pickFile(cb){ const inp=$("#hiddenFile"); inp.value=""; inp.onchange=()=>{ if(inp.files[0]) cb(inp.files[0]); }; inp.click(); }
+function handleFile(file){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    const txt=reader.result;
+    if(/\.json$/i.test(file.name) || /^\s*\{/.test(txt)){
+      try{ applyJsonImport(JSON.parse(txt)); }catch(e){ toast("Invalid JSON: "+e.message,true); }
+    } else {
+      $("#impPaste") ? ($("#impPaste").value=txt) : doImportHtml(txt);
+      toast("Loaded HTML into paste box");
+    }
+  };
+  reader.readAsText(file);
+}
+function applyJsonImport(o){
+  if(!o || typeof o!=="object"){ toast("Unrecognized file",true); return; }
+  let applied=[];
+  if(o.style){ state.style=Object.assign(deepClone(DEFAULT_STYLE), o.style); applied.push("style"); }
+  if(o.profile){ state.profile=Object.assign(deepClone(DEFAULT_PROFILE), o.profile); applied.push("profile"); }
+  if(o.socials){ state.socials=o.socials; applied.push("socials"); }
+  if(o.customFields){ state.customFields=o.customFields; }
+  if(o.html){ state.html=o.html; applied.push("layout"); }
+  snapshot(); renderAll(); persist(); closeModal();
+  toast("Imported: "+(applied.join(", ")||"nothing recognized"));
+}
+
+/* ================================================================
+   MODAL plumbing
+   ================================================================ */
+function setModal(title, bodyHtml, buttons){
+  $("#modalTitle").textContent=title; $("#modalBody").innerHTML=bodyHtml;
+  const foot=$("#modalFoot"); foot.innerHTML="";
+  (buttons||[]).forEach(b=>{ const btn=el("button",{class:"btn "+(b.cls||"")}, b.label); btn.addEventListener("click",b.act); foot.appendChild(btn); });
+  $("#modalBack").classList.add("show");
+}
+function closeModal(){ $("#modalBack").classList.remove("show"); }
+
+/* ================================================================
+   PANEL RESIZERS + CANVAS PAN/ZOOM
+   ================================================================ */
+function setupResizers(){
+  const sidebar=$(".sidebar"), rawPanel=$("#rawPanel");
+  const dragResize=(handle, onMove)=>{
+    if(!handle) return;
+    handle.addEventListener("mousedown",ev=>{
+      ev.preventDefault(); handle.classList.add("active");
+      const move=e=>onMove(e);
+      const up=()=>{ handle.classList.remove("active"); document.removeEventListener("mousemove",move); document.removeEventListener("mouseup",up); persistPanelSizes(); };
+      document.addEventListener("mousemove",move); document.addEventListener("mouseup",up);
+    });
+  };
+  dragResize($("#resizeLeft"), e=>{ const w=Math.max(220,Math.min(520, e.clientX)); sidebar.style.width=w+"px"; });
+  dragResize($("#resizeRight"), e=>{ const vw=window.innerWidth; const w=Math.max(0,Math.min(820, vw-e.clientX)); if(!state.rawOpen && w>40){ state.rawOpen=true; rawPanel.classList.remove("collapsed"); } rawPanel.style.width=w+"px"; });
+  // restore persisted sizes
+  try{ const s=JSON.parse(localStorage.getItem("sig-panels")||"{}"); if(s.sidebar) sidebar.style.width=s.sidebar+"px"; if(s.raw) rawPanel.style.width=s.raw+"px"; }catch(e){}
+}
+function persistPanelSizes(){
+  try{ localStorage.setItem("sig-panels", JSON.stringify({ sidebar:parseInt($(".sidebar").style.width)||340, raw:parseInt($("#rawPanel").style.width)||440 })); }catch(e){}
+}
+function setupCanvasPanZoom(){
+  const stage=$("#stage");
+  let panning=false, sx=0, sy=0, ox=0, oy=0;
+  stage.addEventListener("mousedown",e=>{
+    if(e.button!==1) return;       // middle mouse button only
+    e.preventDefault(); panning=true; stage.classList.add("panning");
+    sx=e.clientX; sy=e.clientY; ox=view.x; oy=view.y;
+  });
+  window.addEventListener("mousemove",e=>{ if(!panning) return; view.x=ox+(e.clientX-sx); view.y=oy+(e.clientY-sy); clampPan(); applyView(); });
+  window.addEventListener("mouseup",e=>{ if(e.button===1){ panning=false; stage.classList.remove("panning"); } });
+  // Ctrl/Cmd + wheel to zoom
+  stage.addEventListener("wheel",e=>{ if(e.ctrlKey||e.metaKey){ e.preventDefault(); setZoom(view.zoom + (e.deltaY<0?0.1:-0.1)); } }, {passive:false});
+}
+
+/* ================================================================
+   WIRING / INIT
+   ================================================================ */
+function bindUI(){
+  // side tabs
+  $$(".side-tab").forEach(t=>t.addEventListener("click",()=>switchSideTab(t.getAttribute("data-tab"))));
+  // device / bg / edit
+  $$(".pill[data-device]").forEach(p=>p.addEventListener("click",()=>{ state.device=p.getAttribute("data-device"); applyDeviceBg(); persist(); }));
+  $("#bgPill").addEventListener("click",()=>{ state.bg = state.bg==="dark"?"light":"dark"; applyDeviceBg(); persist(); });
+  $("#editPill").addEventListener("click",()=>{ state.editMode=!state.editMode; applyDeviceBg(); });
+  $("#normalizePill").addEventListener("click",openNormalizeModal);
+  // canvas overlay toggles
+  $("#labelsPill").addEventListener("click",()=>{ state.showLabels=!state.showLabels; applyDeviceBg(); persist(); });
+  $("#boxesPill").addEventListener("click",()=>{ state.showBoxes=!state.showBoxes; applyDeviceBg(); persist(); });
+  // zoom / fit
+  $("#zoomIn").addEventListener("click",()=>setZoom(view.zoom+0.1));
+  $("#zoomOut").addEventListener("click",()=>setZoom(view.zoom-0.1));
+  $("#fitPill").addEventListener("click",fitToView);
+  // collapsible Add section
+  const ah=$("#addHead"); if(ah) ah.addEventListener("click",()=>$("#addSection").classList.toggle("collapsed"));
+  // panel resizers + canvas pan + wheel zoom
+  setupResizers(); setupCanvasPanZoom();
+  // raw toggle
+  $("#btnToggleRaw").addEventListener("click",()=>{ state.rawOpen=!state.rawOpen; $("#rawPanel").classList.toggle("collapsed",!state.rawOpen); if(state.rawOpen) updateRawFromState(); });
+  // header actions
+  $("#btnImport").addEventListener("click",openImportModal);
+  $("#btnSaveMenu").addEventListener("click",openSaveModal);
+  $("#btnReset").addEventListener("click",openResetModal);
+  $("#btnCopy").addEventListener("click",copySignature);
+  $("#btnUndo").addEventListener("click",undo);
+  $("#btnRedo").addEventListener("click",redo);
+  // sidebar adders
+  $("#btnAddField").addEventListener("click",addCustomField);
+  $("#btnAddSocial").addEventListener("click",()=>{ state.socials.push({id:uid("s"),type:"linkedin",url:""}); renderSocials(); });
+  $("#btnSaveTpl").addEventListener("click",saveTemplate);
+  // modal close
+  $("#modalClose").addEventListener("click",closeModal);
+  $("#modalBack").addEventListener("click",e=>{ if(e.target===$("#modalBack")) closeModal(); });
+  // connect banner cancel
+  $("#connectCancel").addEventListener("click",()=>{ connectMode.active=false; $("#connectBanner").classList.remove("show"); });
+  // click empty paper deselects
+  $("#stage").addEventListener("click",e=>{ if(e.target.id==="stage"||e.target.id==="paper"){ selectBlock(null); openInspectorFor(null); } });
+  // ALWAYS suppress link navigation (mailto:/tel:/http) inside the editor canvas
+  $("#paper").addEventListener("click", e=>{ const a=e.target.closest && e.target.closest("a"); if(a){ e.preventDefault(); } }, true);
+  // canvas hover -> bounding box + field highlight
+  $("#paper").addEventListener("mousemove", onCanvasHover);
+  $("#paper").addEventListener("mouseleave", ()=>{ hideCanvasBox(); $$("#fieldsHost .cfield.highlight").forEach(f=>f.classList.remove("highlight")); });
+  // left-panel field filter chips
+  $$("#fieldFilter .rv-chip").forEach(c=>c.addEventListener("click",()=>{ fieldFilter=c.getAttribute("data-f"); $$("#fieldFilter .rv-chip").forEach(x=>x.classList.toggle("active",x===c)); renderFields(); }));
+  // keyboard
+  document.addEventListener("keydown",e=>{
+    const typing=/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) || document.activeElement.isContentEditable;
+    if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==="z" && !e.shiftKey){ e.preventDefault(); undo(); }
+    else if((e.ctrlKey||e.metaKey) && (e.key.toLowerCase()==="y" || (e.key.toLowerCase()==="z" && e.shiftKey))){ e.preventDefault(); redo(); }
+    else if(!typing && (e.key==="Delete"||e.key==="Backspace") && selectedBlock){ e.preventDefault(); deleteBlock(selectedBlock); }
+  });
+  setupPaletteDrag();
+  setupCanvasDrop();
+  setupRawPanel();
+}
+
+function init(){
+  loadPersisted();
+  bindUI();
+  renderAll();
+  snapshot();
+  updateUndoButtons();
+}
+
+if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",init);
+else init();
+
 })();
 </script>
 </body>
