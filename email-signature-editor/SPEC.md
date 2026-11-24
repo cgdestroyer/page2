@@ -330,17 +330,23 @@ Poprawna wersja trzyma się tych zasad:
    listener per blok ustawiał przeciągany element na najbardziej zewnętrzny
    blok (całą tabelę). `ev.target.closest("[data-sig-block]")` daje blok pod
    kursorem.
-2. **Przenosimy "jednostkę" (`movableUnit`), nie liść.** Jednostka to cała linia
-   tekstu / obraz / tabela, która sama niesie swoje odstępy:
-   - element inline (`a`, `span`, `b`, inline `img`) → najbliższy blok-rodzic,
-   - jedyna zawartość komórki `<td>` → ta komórka,
-   - samotna komórka w wierszu → wiersz; samotny wiersz → cała tabela,
-   - w przeciwnym razie sam element.
-3. **`<td>`, `<tr>`, `<li>` są sztywne:** zmieniają kolejność tylko wśród
-   rodzeństwa tego samego rodzica (kolumny zamieniają się miejscami w wierszu,
-   wiersze w tabeli). Dzięki temu `colspan`, padding komórek i geometria tabeli
-   się nie rozjeżdżają. Upuszczenie daleko od rodzica jest zablokowane (brak
-   `preventDefault` w `dragover`).
+2. **Przenosimy "jednostkę" (`movableUnit`), nie liść.** Przeglądarka zaczyna
+   przeciąganie na NAJGŁĘBSZYM elemencie `draggable` (zwykle `<img>` w linku).
+   Jednostka to rzecz, która musi jechać w jednym kawałku:
+   - element wewnątrz elementu inline (`<img>` w `<a>`) jedzie RAZEM z nim.
+     Rozdzielenie dawało pusty `<a>` (pudełko bez obrazka) i obrazek bez linku,
+   - element inline (`a`, `span`, `b`) → blok-linia, która go trzyma, chyba że
+     jest jedyną zawartością komórki,
+   - jedyna zawartość komórki to ona sama (swobodna treść),
+   - samotna komórka → jej wiersz; samotny wiersz → cała tabela.
+3. **Dwa tryby upuszczania dla treści będącej jedyną zawartością komórki
+   kolumny** (`rigidAncestor`):
+   a) kursor w obrębie własnego wiersza → przenosi się KOMÓRKA wśród sąsiednich
+      komórek (kolumny/ikony zamieniają się miejscami razem z paddingiem),
+   b) kursor gdzie indziej (albo wciśnięty Alt) → przenosi się SAMA TREŚĆ do
+      dowolnego kontenera; komórka źródłowa zostaje pusta.
+   `<td>`/`<tr>`/`<li>` chwycone bezpośrednio (komórki z tekstem) są zawsze
+   sztywne: tylko wśród rodzeństwa tego samego rodzica; poza nim drop zablokowany.
 4. **Elementy swobodne** (linie, obrazy, tabele, klocki z palety) wolno upuścić
    do dowolnego prawdziwego kontenera (`isSlot`): `td`/`th`/`div` albo korzeń
    sygnatury, który nie ma własnego tekstu, ma blokową zawartość albo jest
@@ -351,12 +357,13 @@ Poprawna wersja trzyma się tych zasad:
    Tak samo ramka źródła (`#dragSrcBox`).
 6. **Żadnych śladów edytora w `state.html`:** `stripEditorChrome` usuwa też
    `draggable` i puste `style=""`; nie zmieniamy `opacity` przeciąganego węzła.
-7. **Shift przy starcie przeciągania** podnosi jednostkę o poziom (komórka →
-   wiersz → tabela).
+7. **Shift przy starcie przeciągania** podnosi jednostkę o poziom (treść →
+   komórka → wiersz → tabela). **Alt** przy upuszczaniu wymusza tryb swobodny.
 8. Po zmianie struktury: `syncHtmlFromPaper()` → `snapshot()` (snapshot ZAWSZE
    po zmianie stanu, inaczej Undo jest o jeden krok do tyłu) → render, a
    przesunięty element zostaje zaznaczony (ścieżka po indeksach `contentChildren`).
-9. Przyciski ↑ ↓ ⧉ w mini-toolbarze działają na tej samej jednostce.
+9. Przyciski ↑ ↓ ⧉ w mini-toolbarze działają na tej samej jednostce. Gdy jednostka
+   jest jedyna w komórce, ↑/↓ przesuwa jej wiersz.
 
 ## 12. Pola obrazów w zakładce Content
 
@@ -372,3 +379,26 @@ Poprawna wersja trzyma się tych zasad:
   przepuszczane przez `esc()`**: `&` w URL (`?w=200&h=100`) zamieniał się w
   `&amp;` i psuł adres po edycji. `esc()` tylko dla treści wstawianej przez
   `innerHTML`.
+
+## 13. Inspect: skok z elementu do kodu
+
+Opcjonalny tryb (pigułka `</> Inspect` na pasku canvasu, domyślnie wyłączony,
+nie zapisywany) plus jednorazowy przycisk `</>` w mini-toolbarze zaznaczonego
+elementu.
+
+- Klik w element (faza capture na `#paper`, więc `ev.target` to dokładny element
+  pod kursorem) → `inspectElement(target)`.
+- `paperElementIndex`: numer elementu w kolejności dokumentu, z pominięciem
+  poddrzew `[data-chrome]`. Kod w panelu Raw to serializacja tego samego DOM bez
+  chrome, więc numery się zgadzają. Przed skokiem robimy `syncHtmlFromPaper()`
+  i odświeżamy panel.
+- `findElementRange(code, k)`: jednoprzebiegowy tokenizer (pomija komentarze,
+  szanuje cudzysłowy w atrybutach, zna tagi void, stos zamknięć) zwraca
+  `{start, openEnd, end, tag}` k-tego elementu. Mały element jest zaznaczany
+  w całości (≤ 400 znaków), duży tylko tagiem otwierającym.
+- Podświetlenie: `CSS.highlights` (`::highlight(sig-inspect)`) na warstwie
+  `#rawHl`, bo `textarea` ma przezroczysty tekst; fallback `setSelectionRange`.
+  Scroll wyliczany z `Range.getClientRects()` na `#rawHl` (obsługuje zawijanie
+  wierszy). Gdy panel był zwinięty, pomiar czeka na koniec animacji (240 ms).
+- `updateRawFromState` nie nadpisuje `value`, jeśli się nie zmieniło (zachowuje
+  scroll).
