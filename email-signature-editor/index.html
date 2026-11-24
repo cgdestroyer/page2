@@ -267,6 +267,9 @@
   .drop-indicator.show { display: block; }
   .drag-src-box { position: fixed; display: none; border: 2px dashed var(--warn); border-radius: 3px; pointer-events: none; z-index: 64; background: rgba(230,179,77,.08); }
   .drag-src-box.show { display: block; }
+  /* Inspect: code range highlighted in the raw panel */
+  ::highlight(sig-inspect) { background-color: rgba(230,179,77,.38); }
+  .raw-editor::selection { background: rgba(108,140,255,.35); }
   /* image URL row in the Content tab */
   .imgrow { display: flex; gap: 7px; align-items: center; margin-top: 7px; }
   .imgrow input { flex: 1; min-width: 0; }
@@ -545,6 +548,7 @@
         <button class="zbtn" id="zoomIn" title="Zoom in">+</button>
       </span>
       <span class="pill" id="normalizePill" title="Normalize tags / rebuild">⟳ Normalize</span>
+      <span class="pill" id="inspectPill" title="Inspect: click an element in the design to jump to its HTML (like browser DevTools)">&lt;/&gt; Inspect</span>
       <span class="hint" id="healthHint"></span>
     </div>
     <div class="connect-banner" id="connectBanner">
@@ -695,7 +699,8 @@ let state = {
   customFields: [],            // {key,label,type,value}
   lineIcons: {},               // roleKey -> icon URL (optional leading icon per line)
   device:"desktop", bg:"light", editMode:true, rawOpen:false,
-  showLabels:false, showBoxes:false
+  showLabels:false, showBoxes:false,
+  inspect:false              // click an element -> jump to its code (not persisted)
 };
 
 /* built-in leading-icon set (hosted, email-safe) for contact lines etc. */
@@ -909,6 +914,7 @@ function decorateBlocks(paper){
     tb.appendChild(el("button",{title:"Move up",onclick:ev=>{ev.stopPropagation();moveBlock(b,-1);}},"↑"));
     tb.appendChild(el("button",{title:"Move down",onclick:ev=>{ev.stopPropagation();moveBlock(b,1);}},"↓"));
     tb.appendChild(el("button",{title:"Duplicate",onclick:ev=>{ev.stopPropagation();duplicateBlock(b);}},"⧉"));
+    tb.appendChild(el("button",{title:"Show this element in the HTML",style:"width:24px;font-size:8px;",onclick:ev=>{ev.stopPropagation();inspectElement(b);}},"&lt;/&gt;"));
     tb.appendChild(el("button",{title:"Delete",onclick:ev=>{ev.stopPropagation();deleteBlock(b);}},"🗑"));
     b.appendChild(tb);
     // resize handles for images/buttons/tables
@@ -1049,11 +1055,18 @@ function applyStyleToDom(paper){
    BLOCK OPERATIONS
    ================================================================ */
 function moveBlock(b, dir){
-  const paper=$("#paper"); const u=movableUnit(b,paper); const p=u.parentElement; if(!p) return;
-  const sibs=contentChildren(p); const j=sibs.indexOf(u)+dir;
-  if(j<0 || j>=sibs.length){ toast(dir<0?"Already first":"Already last"); return; }
-  if(dir<0) sibs[j].before(u); else sibs[j].after(u);
-  commitStructure(b);
+  const paper=$("#paper"); let u=movableUnit(b,paper);
+  for(let g=0; g<6 && u && u.parentElement && u!==paper; g++){
+    const sibs=contentChildren(u.parentElement);
+    if(!/^(TD|TH)$/.test(u.tagName) && sibs.length>1){
+      const j=sibs.indexOf(u)+dir;
+      if(j>=0 && j<sibs.length){ if(dir<0) sibs[j].before(u); else sibs[j].after(u); commitStructure(b); return; }
+      break;                                   // edge of a list that has siblings
+    }
+    const next=liftUnit(u,paper);              // lone item / a cell: the move applies to its row
+    if(next===u) break; u=next;
+  }
+  toast(dir<0?"Already first":"Already last");
 }
 function duplicateBlock(b){
   const paper=$("#paper"); const u=movableUnit(b,paper);
@@ -1097,6 +1110,7 @@ function applyDeviceBg(){
   $("#editPill").classList.toggle("active", state.editMode);
   const lp=$("#labelsPill"); if(lp) lp.classList.toggle("active", !!state.showLabels);
   const bp=$("#boxesPill"); if(bp) bp.classList.toggle("active", !!state.showBoxes);
+  const ip=$("#inspectPill"); if(ip) ip.classList.toggle("active", !!state.inspect);
   setupMobileScreen();
 }
 
@@ -1752,7 +1766,7 @@ const scheduleSyncInspector=debounce(()=>{ applyProfileToDom($("#paper")); syncH
 /* ================================================================
    DRAG & DROP — palette add + block reorder + resize
    ================================================================ */
-let dragKind=null, draggedBlock=null, draggedUnit=null, dropLine=null;
+let dragKind=null, draggedBlock=null, draggedUnit=null, draggedRigid=null, dropLine=null;
 
 function newBlockHtml(kind){
   const s=S();
@@ -1773,7 +1787,7 @@ function newBlockHtml(kind){
 
 function setupPaletteDrag(){
   $$(".pal-item[data-add]").forEach(item=>{
-    item.addEventListener("dragstart",ev=>{ dragKind="palette"; draggedBlock=null; draggedUnit=null; ev.dataTransfer.setData("text/plain", item.getAttribute("data-add")); ev.dataTransfer.effectAllowed="copy"; });
+    item.addEventListener("dragstart",ev=>{ dragKind="palette"; draggedBlock=null; draggedUnit=null; draggedRigid=null; ev.dataTransfer.setData("text/plain", item.getAttribute("data-add")); ev.dataTransfer.effectAllowed="copy"; });
     item.addEventListener("dragend",()=>{ resetDrag(); });
   });
 }
@@ -1781,16 +1795,23 @@ function setupPaletteDrag(){
 /* ================================================================
    STRUCTURE-SAFE DRAG & DROP
    Rules that keep the layout predictable:
-   1. We never move a raw leaf. We move the "movable unit" (movableUnit):
-      the whole text line / image / table that owns its own spacing.
-      <td> / <tr> / <li> are RIGID: they only reorder among their siblings
-      (columns swap inside a row, rows reorder inside a table), so colspans,
-      cell padding and table geometry never break.
-   2. Free items (lines, images, tables, palette blocks) can be dropped into
-      any real container (td, div, signature root) - never into a text line.
-   3. The insertion marker is a fixed overlay, NOT a DOM node, so nothing
-      shifts while dragging (the old in-DOM marker caused the jumping).
-   4. Hold Shift while starting a drag to move the PARENT (e.g. the whole row).
+   1. The browser starts a drag on the INNERMOST draggable (usually the <img>
+      inside a link). We never move that raw leaf: movableUnit() resolves it
+      to the thing that must travel as one piece:
+        - an <img> inside <a> moves WITH its link (never split from an inline ancestor),
+        - inline pieces belong to the text line that holds them,
+        - the lone content of a table cell is the content itself (free to move),
+        - a lone cell is its row, a lone row is its table.
+   2. Two drop modes for content that is the only thing in a column cell:
+        a) pointer inside its own row  -> the CELL reorders among its sibling
+           cells (columns swap; padding/colspan travel with the cell),
+        b) pointer elsewhere (or Alt held) -> the CONTENT moves into any real
+           container (td/div/root), the source cell stays as an empty cell.
+      <td>/<tr>/<li> grabbed directly (text cells) are always rigid (a only).
+   3. Containers (isSlot) are td/th/div/root without own text that hold block
+      content or are empty. Text lines and spacer/divider cells are not.
+   4. The insertion marker is a fixed overlay, not a DOM node: no layout shift.
+   5. Shift while starting a drag lifts the unit one level (content -> row).
    ================================================================ */
 function contentChildren(p){
   return Array.from(p.children).filter(c=>!c.hasAttribute("data-chrome") && !c.classList.contains("sig-line-icon"));
@@ -1802,8 +1823,6 @@ function isInlineEl(n){
   if(!n || n.nodeType!==1) return false;
   return getComputedStyle(n).display.indexOf("inline")===0;
 }
-/* a container that may receive dropped items: td/th/div (or the signature root)
-   that holds real block content or is truly empty - never a text line */
 function isSlot(n, paper){
   if(n===paper) return true;
   if(!n || n.nodeType!==1 || n.hasAttribute("data-chrome")) return false;
@@ -1813,57 +1832,74 @@ function isSlot(n, paper){
   if(!kids.length) return n.textContent.trim()==="" && n.textContent.indexOf("\u00a0")<0;   // spacer/divider cells carry &nbsp; -> not a slot
   return kids.some(k=>!isInlineEl(k));
 }
-/* the element that actually moves when the user grabs block `b` */
+/* the element that actually travels when the user grabs block `b` */
 function movableUnit(b, paper){
   let u=b;
-  // inline pieces (a, span, b, inline img) belong to the line/cell that contains them
-  while(u.parentElement && u.parentElement!==paper && isInlineEl(u)) u=u.parentElement;
-  for(let i=0;i<10;i++){
+  for(let g=0; g<12; g++){
     const p=u.parentElement; if(!p || p===paper) break;
-    const t=u.tagName;
-    if(t==="TD" || t==="TH"){
-      if(contentChildren(p).length>1) break;            // real column: rigid, reorders in its row
-      u=p; continue;                                    // lone cell -> its row
+    if(isInlineEl(p)){ u=p; continue; }                       // an <img> inside <a> moves WITH the link
+    if(isInlineEl(u)){                                          // inline piece -> the line that holds it,
+      const lone=/^(TD|TH)$/.test(p.tagName) && !hasOwnText(p) && contentChildren(p).length===1;
+      if(!lone){ u=p; continue; }                               // ...unless it is the lone content of a cell
     }
+    const t=u.tagName;
+    if(t==="TD" || t==="TH"){ if(contentChildren(p).length>1) break; u=p; continue; }   // lone cell -> its row
     if(t==="TR"){
-      if(contentChildren(p).length>1) break;            // real row: rigid, reorders in its table
-      const tbl=p.closest("table");                     // lone row -> the whole table
+      if(contentChildren(p).length>1) break;                    // real row among rows
+      const tbl=p.closest("table");                             // lone row -> the table
       if(tbl && tbl!==paper && paper.contains(tbl)) u=tbl;
       break;
     }
-    // sole content of a table cell -> move the cell (keeps its padding/width with it)
-    if((p.tagName==="TD" || p.tagName==="TH") && contentChildren(p).length===1 && !hasOwnText(p)){ u=p; continue; }
+    // lone content of a lone cell (single-column wrapper) -> climb to the row
+    if(/^(TD|TH)$/.test(p.tagName) && !hasOwnText(p) && contentChildren(p).length===1 && contentChildren(p.parentElement).length===1){ u=p; continue; }
     break;
   }
   return u;
 }
-/* Shift-drag: one level up (cell -> row -> table, line -> its cell/container) */
+/* the rigid thing that reorders among siblings: the unit itself (td/tr/li) or
+   the column cell whose only content is the unit */
+function rigidAncestor(u){
+  if(/^(TD|TH|TR|LI)$/.test(u.tagName)) return u;
+  const p=u.parentElement;
+  if(p && /^(TD|TH)$/.test(p.tagName) && !hasOwnText(p) && contentChildren(p).length===1){
+    const row=p.parentElement;
+    if(row && contentChildren(row).length>1) return p;
+  }
+  return null;
+}
+/* Shift-drag / toolbar bubbling: one level up (content -> cell -> row -> table) */
 function liftUnit(u, paper){
+  const r=rigidAncestor(u);
+  if(r && r!==u) return liftUnit(r,paper);
   const p=u.parentElement; if(!p || p===paper) return u;
   if(u.tagName==="TR"){ const tbl=u.closest("table"); return (tbl && tbl!==paper && paper.contains(tbl)) ? movableUnit(tbl,paper) : u; }
+  if(/^(TD|TH)$/.test(u.tagName)) return contentChildren(p.parentElement).length>1 ? p : movableUnit(p,paper);
   return movableUnit(p,paper);
 }
 
-/* where would the dragged thing land? -> {parent, before, horiz} or null */
+/* where would the dragged thing land? -> {parent, before, horiz, node} or null */
 function computeDrop(ev, paper){
-  const unit = dragKind==="block" ? draggedUnit : null;
-  let t=ev.target; if(!t || t.nodeType!==1 || !paper.contains(t)) return null;
-  // rigid items: only reorder inside their own parent
-  if(unit && /^(TD|TH|TR|LI)$/.test(unit.tagName)){
-    const parent=unit.parentElement; if(!parent) return null;
-    const horiz=(unit.tagName==="TD" || unit.tagName==="TH");
+  const unit  = dragKind==="block" ? draggedUnit  : null;
+  const rigid = dragKind==="block" ? draggedRigid : null;
+  const t=ev.target; if(!t || t.nodeType!==1 || !paper.contains(t)) return null;
+  if(rigid && rigid.parentElement && !(ev.altKey && rigid!==unit)){
+    const parent=rigid.parentElement;
+    const horiz=/^(TD|TH)$/.test(rigid.tagName);
     const pr=parent.getBoundingClientRect(), pad=28;
-    if(ev.clientX<pr.left-pad || ev.clientX>pr.right+pad || ev.clientY<pr.top-pad || ev.clientY>pr.bottom+pad) return null;
-    let before=null;
-    for(const sb of contentChildren(parent)){
-      if(sb===unit) continue;
-      const r=sb.getBoundingClientRect();
-      const mid = horiz ? r.left+r.width/2 : r.top+r.height/2;
-      if((horiz?ev.clientX:ev.clientY) < mid){ before=sb; break; }
+    const inside = ev.clientX>=pr.left-pad && ev.clientX<=pr.right+pad && ev.clientY>=pr.top-pad && ev.clientY<=pr.bottom+pad;
+    if(inside){
+      let before=null;
+      for(const sb of contentChildren(parent)){
+        if(sb===rigid) continue;
+        const r=sb.getBoundingClientRect();
+        const mid = horiz ? r.left+r.width/2 : r.top+r.height/2;
+        if((horiz?ev.clientX:ev.clientY) < mid){ before=sb; break; }
+      }
+      return { parent, before, horiz, node:rigid };
     }
-    return { parent, before, horiz };
+    if(rigid===unit) return null;            // td/tr grabbed directly: only inside its own parent
   }
-  // free items: nearest real container under the pointer
+  // free move: nearest real container under the pointer
   let c=t;
   while(c && c!==paper){
     const ch=c.closest("[data-chrome]"); if(ch){ c=ch.parentElement; continue; }
@@ -1877,13 +1913,13 @@ function computeDrop(ev, paper){
     const r=k.getBoundingClientRect(); if(r.width===0 && r.height===0) continue;
     if(ev.clientY < r.top+r.height/2){ before=k; break; }
   }
-  return { parent:slot, before, horiz:false };
+  return { parent:slot, before, horiz:false, node:unit };
 }
 
 function drawDropIndicator(d){
   const ind=$("#dropIndicator"); if(!ind) return;
   if(!d){ ind.classList.remove("show"); return; }
-  const kids=contentChildren(d.parent).filter(k=>k!==draggedUnit);
+  const kids=contentChildren(d.parent).filter(k=>k!==d.node);
   const ref=d.before || kids[kids.length-1];
   const pr=d.parent.getBoundingClientRect();
   let x,y,w,h;
@@ -1909,7 +1945,7 @@ function hideDropUi(){
   const i=$("#dropIndicator"); if(i) i.classList.remove("show");
   const b=$("#dragSrcBox"); if(b) b.classList.remove("show");
 }
-function resetDrag(){ dragKind=null; draggedBlock=null; draggedUnit=null; hideDropUi(); }
+function resetDrag(){ dragKind=null; draggedBlock=null; draggedUnit=null; draggedRigid=null; hideDropUi(); }
 function removeDropLine(){ hideDropUi(); }   // legacy name
 
 /* position of a node among content children, from the signature root (survives re-render) */
@@ -1939,7 +1975,7 @@ function setupCanvasDrop(){
     const b=t.closest("[data-sig-block]"); if(!b || !paper.contains(b)) return;
     dragKind="block"; draggedBlock=b;
     let u=movableUnit(b,paper); if(ev.shiftKey) u=liftUnit(u,paper);
-    draggedUnit=u;
+    draggedUnit=u; draggedRigid=rigidAncestor(u);
     ev.dataTransfer.effectAllowed="move";
     try{ ev.dataTransfer.setData("text/plain","__block__"); }catch(e){}
     showSrcBox(u);
@@ -1964,13 +2000,79 @@ function setupCanvasDrop(){
       if(kind==="palette"){
         const node=el("div",null,newBlockHtml(ev.dataTransfer.getData("text/plain"))).firstElementChild;
         if(node){ d.parent.insertBefore(node,d.before); moved=node; }
-      } else if(!unit.contains(d.parent)){
-        d.parent.insertBefore(unit,d.before); moved=blk||unit;
+      } else if(d.node && paper.contains(d.node) && !d.node.contains(d.parent)){
+        d.parent.insertBefore(d.node,d.before); moved=blk||d.node;
       }
     }
     resetDrag();
     if(moved) commitStructure(moved);
   });
+}
+
+/* ================================================================
+   INSPECT — jump from an element in the design to its code
+   ================================================================ */
+/* index of `target` among all signature elements in document order (editor chrome skipped) */
+function paperElementIndex(target, paper){
+  const walker=document.createTreeWalker(paper, NodeFilter.SHOW_ELEMENT, {
+    acceptNode(n){ return n.hasAttribute("data-chrome") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; }
+  });
+  let i=0, n;
+  while((n=walker.nextNode())){ if(n===target) return i; i++; }
+  return -1;
+}
+/* locate the k-th element (document order) inside formatted code -> {start, openEnd, end, tag} */
+function findElementRange(code, k){
+  const VOID=/^(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$/i;
+  const stack=[]; let i=0, idx=-1;
+  while(i<code.length){
+    const lt=code.indexOf("<",i); if(lt<0) break;
+    if(code.startsWith("<!--",lt)){ const e=code.indexOf("-->",lt+4); i=e<0?code.length:e+3; continue; }
+    if(code[lt+1]==="/"){
+      const gt=code.indexOf(">",lt); const end=gt<0?code.length:gt+1;
+      const e=stack.pop(); if(e && e.idx===k) return {start:e.start, openEnd:e.openEnd, end, tag:e.tag};
+      i=end; continue;
+    }
+    const m=/^<([a-zA-Z][^\s\/>]*)/.exec(code.slice(lt,lt+80)); if(!m){ i=lt+1; continue; }
+    let j=lt+m[0].length, q=null;                      // read the open tag, honouring quoted attribute values
+    while(j<code.length){ const c=code[j]; if(q){ if(c===q) q=null; } else if(c==='"' || c==="'") q=c; else if(c===">") break; j++; }
+    const oe=j+1; idx++;
+    if(VOID.test(m[1]) || code[j-1]==="/"){ if(idx===k) return {start:lt, openEnd:oe, end:oe, tag:m[1].toLowerCase()}; }
+    else stack.push({idx, start:lt, openEnd:oe, tag:m[1].toLowerCase()});
+    i=oe;
+  }
+  return null;
+}
+function domTextPos(root, offset){
+  const w=document.createTreeWalker(root, NodeFilter.SHOW_TEXT); let n, acc=0, last=null;
+  while((n=w.nextNode())){ const len=n.nodeValue.length; last=n; if(offset<=acc+len) return {node:n, off:offset-acc}; acc+=len; }
+  return last ? {node:last, off:last.nodeValue.length} : null;
+}
+function revealCodeRange(a, b){
+  const pre=$("#rawHl"), ed=$("#rawEditor"); if(!pre || !ed) return;
+  const s0=domTextPos(pre,a), e0=domTextPos(pre,b); if(!s0 || !e0) return;
+  const rg=document.createRange(); rg.setStart(s0.node,s0.off); rg.setEnd(e0.node,e0.off);
+  if(window.CSS && CSS.highlights && window.Highlight) CSS.highlights.set("sig-inspect", new Highlight(rg));
+  try{ ed.setSelectionRange(a,b); }catch(e){}
+  try{
+    const rr=rg.getClientRects()[0] || rg.getBoundingClientRect();
+    const y=rr.top - pre.getBoundingClientRect().top + pre.scrollTop;
+    ed.scrollTop=Math.max(0, y - ed.clientHeight*0.3); pre.scrollTop=ed.scrollTop;
+  }catch(e){}
+}
+function inspectElement(target){
+  const paper=$("#paper"); if(!target || target===paper || !paper.contains(target)) return;
+  const k=paperElementIndex(target,paper); if(k<0) return;
+  syncHtmlFromPaper();                                   // code panel must match the DOM exactly
+  const panel=$("#rawPanel"); const wasClosed=panel.classList.contains("collapsed");
+  state.rawOpen=true; panel.classList.remove("collapsed");
+  rawEditing=false; updateRawFromState();
+  const code=$("#rawEditor").value; const r=findElementRange(code,k);
+  if(!r){ toast("Couldn't locate that element in the code", true); return; }
+  const to=(r.end-r.start<=400) ? r.end : r.openEnd;     // small element: whole thing; big one: its opening tag
+  const line=code.slice(0,r.start).split("\n").length;
+  const go=()=>{ revealCodeRange(r.start,to); const m=$("#rawMsg"); m.className="msg ok"; m.textContent="Inspecting <"+r.tag+"> · line "+line; };
+  if(wasClosed) setTimeout(go,240); else go();          // wait for the panel's open animation before measuring
 }
 
 /* ---- resize handles ---- */
@@ -2005,7 +2107,8 @@ let rawEditing=false;
 function updateRawFromState(){
   if(rawEditing) return;
   const ed=$("#rawEditor"); const code=prettyHtml(state.html);
-  ed.value=code; paintHighlight(code); $("#rawMsg").className="msg"; $("#rawMsg").textContent="In sync with design.";
+  if(ed.value!==code) ed.value=code;
+  paintHighlight(code); $("#rawMsg").className="msg"; $("#rawMsg").textContent="In sync with design.";
 }
 function paintHighlight(code){ $("#rawHl").innerHTML=highlightHtml(code)+"\n"; }
 function highlightHtml(code){
@@ -2867,6 +2970,8 @@ function bindUI(){
   // canvas overlay toggles
   $("#labelsPill").addEventListener("click",()=>{ state.showLabels=!state.showLabels; applyDeviceBg(); persist(); });
   $("#boxesPill").addEventListener("click",()=>{ state.showBoxes=!state.showBoxes; applyDeviceBg(); persist(); });
+  // Inspect mode (optional): click an element in the design -> jump to its code
+  $("#inspectPill").addEventListener("click",()=>{ state.inspect=!state.inspect; applyDeviceBg(); toast(state.inspect?"Inspect on: click an element to see its HTML":"Inspect off"); });
   // zoom / fit
   $("#zoomIn").addEventListener("click",()=>setZoom(view.zoom+0.1));
   $("#zoomOut").addEventListener("click",()=>setZoom(view.zoom-0.1));
@@ -2897,6 +3002,8 @@ function bindUI(){
   $("#stage").addEventListener("click",e=>{ if(e.target.id==="stage"||e.target.id==="paper"){ selectBlock(null); openInspectorFor(null); } });
   // ALWAYS suppress link navigation (mailto:/tel:/http) inside the editor canvas
   $("#paper").addEventListener("click", e=>{ const a=e.target.closest && e.target.closest("a"); if(a){ e.preventDefault(); } }, true);
+  // inspect mode runs in the capture phase so it sees the exact element under the pointer
+  $("#paper").addEventListener("click", e=>{ if(state.inspect && !connectMode.active && e.target.nodeType===1 && !e.target.closest("[data-chrome]")) inspectElement(e.target); }, true);
   // canvas hover -> bounding box + field highlight
   $("#paper").addEventListener("mousemove", onCanvasHover);
   $("#paper").addEventListener("mouseleave", ()=>{ hideCanvasBox(); $$("#fieldsHost .cfield.highlight").forEach(f=>f.classList.remove("highlight")); });
