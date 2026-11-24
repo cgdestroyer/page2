@@ -317,3 +317,58 @@ Licz obrazy `data:` i puste `href` → pokaż ostrzeżenie; inaczej "✓ email-s
   zostało białe.
 - Stałe overlaye hover po re-renderze / po pan/zoom — zawsze chować.
 - Normalize tag-only vs full — nie rebuildować layoutu bez wyraźnej zgody.
+
+---
+
+## 11. Przeciąganie i zmiana kolejności (silnik "structure-safe")
+
+Naiwna wersja (każdy `[data-sig-block]` jest `draggable`, wstawiamy znacznik
+`<div>` w DOM, cel = najbliższy środek jakiegokolwiek bloku) psuje szablony.
+Poprawna wersja trzyma się tych zasad:
+
+1. **Jeden delegowany `dragstart` na `#paper`.** `dragstart` bąbelkuje, więc
+   listener per blok ustawiał przeciągany element na najbardziej zewnętrzny
+   blok (całą tabelę). `ev.target.closest("[data-sig-block]")` daje blok pod
+   kursorem.
+2. **Przenosimy "jednostkę" (`movableUnit`), nie liść.** Jednostka to cała linia
+   tekstu / obraz / tabela, która sama niesie swoje odstępy:
+   - element inline (`a`, `span`, `b`, inline `img`) → najbliższy blok-rodzic,
+   - jedyna zawartość komórki `<td>` → ta komórka,
+   - samotna komórka w wierszu → wiersz; samotny wiersz → cała tabela,
+   - w przeciwnym razie sam element.
+3. **`<td>`, `<tr>`, `<li>` są sztywne:** zmieniają kolejność tylko wśród
+   rodzeństwa tego samego rodzica (kolumny zamieniają się miejscami w wierszu,
+   wiersze w tabeli). Dzięki temu `colspan`, padding komórek i geometria tabeli
+   się nie rozjeżdżają. Upuszczenie daleko od rodzica jest zablokowane (brak
+   `preventDefault` w `dragover`).
+4. **Elementy swobodne** (linie, obrazy, tabele, klocki z palety) wolno upuścić
+   do dowolnego prawdziwego kontenera (`isSlot`): `td`/`th`/`div` albo korzeń
+   sygnatury, który nie ma własnego tekstu, ma blokową zawartość albo jest
+   naprawdę pusty. Linia tekstu i komórki z `&nbsp;` (spacer, divider) NIE są
+   kontenerami.
+5. **Znacznik wstawiania to nakładka `position:fixed`, nie węzeł DOM.** Znacznik
+   w DOM przesuwał układ w trakcie ruchu (skakanie) i mógł trafić do `<tr>`.
+   Tak samo ramka źródła (`#dragSrcBox`).
+6. **Żadnych śladów edytora w `state.html`:** `stripEditorChrome` usuwa też
+   `draggable` i puste `style=""`; nie zmieniamy `opacity` przeciąganego węzła.
+7. **Shift przy starcie przeciągania** podnosi jednostkę o poziom (komórka →
+   wiersz → tabela).
+8. Po zmianie struktury: `syncHtmlFromPaper()` → `snapshot()` (snapshot ZAWSZE
+   po zmianie stanu, inaczej Undo jest o jeden krok do tyłu) → render, a
+   przesunięty element zostaje zaznaczony (ścieżka po indeksach `contentChildren`).
+9. Przyciski ↑ ↓ ⧉ w mini-toolbarze działają na tej samej jednostce.
+
+## 12. Pola obrazów w zakładce Content
+
+- Powiązany obraz (logo, zdjęcie, banner, własne pole typu image) pokazuje
+  zawsze widoczny wiersz: miniatura (z oznaczeniem błędu ładowania) + pole URL.
+  Jeśli profil jest pusty, URL jest czytany z `<img>` w designie.
+- Edycja: `profile[role] = url` → `renderCanvas()` → `syncHtmlFromPaper()` →
+  snapshot + autosave (debounce 250 ms). Zmiana trafia więc do zapisanego HTML,
+  panelu Raw i eksportu, a nie tylko do DOM.
+- Inspektor ("Image URL") aktualizuje też powiązane pole profilu; inaczej
+  `applyProfileToDom` natychmiast przywracałby stary URL.
+- **Wartości atrybutów przekazywane przez `el()` / `setAttribute` NIE mogą być
+  przepuszczane przez `esc()`**: `&` w URL (`?w=200&h=100`) zamieniał się w
+  `&amp;` i psuł adres po edycji. `esc()` tylko dla treści wstawianej przez
+  `innerHTML`.
