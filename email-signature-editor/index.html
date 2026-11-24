@@ -262,6 +262,18 @@
 
   /* drop indicator when reordering */
   .drop-line { height: 3px; background: var(--accent); border-radius: 2px; margin: 2px 0; box-shadow: 0 0 8px var(--accent); }
+  /* drag & drop overlays: fixed-position, NOT part of the signature DOM, so they never shift the layout */
+  .drop-indicator { position: fixed; display: none; background: var(--accent); border-radius: 2px; box-shadow: 0 0 8px var(--accent); pointer-events: none; z-index: 65; }
+  .drop-indicator.show { display: block; }
+  .drag-src-box { position: fixed; display: none; border: 2px dashed var(--warn); border-radius: 3px; pointer-events: none; z-index: 64; background: rgba(230,179,77,.08); }
+  .drag-src-box.show { display: block; }
+  /* image URL row in the Content tab */
+  .imgrow { display: flex; gap: 7px; align-items: center; margin-top: 7px; }
+  .imgrow input { flex: 1; min-width: 0; }
+  .imgprev { width: 38px; height: 38px; flex: 0 0 auto; border-radius: 6px; border: 1px solid var(--border); background: var(--panel) repeating-conic-gradient(#2a2f48 0% 25%, #1e2339 0% 50%) 50% / 10px 10px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .imgprev img { max-width: 100%; max-height: 100%; display: block; }
+  .imgprev.bad { border-color: var(--danger); }
+  .imgprev.bad img { opacity: .25; }
 
   /* icons in the signature must never pick up editor hover/selection backgrounds */
   .paper img.sig-line-icon, .paper [data-sig-role$="__icon"] { background: transparent !important; outline: none !important; box-shadow: none !important; }
@@ -546,6 +558,8 @@
         </div>
       </div>
       <div class="canvas-box" id="canvasBox"><span class="cb-label" id="canvasBoxLabel"></span></div>
+      <div class="drop-indicator" id="dropIndicator"></div>
+      <div class="drag-src-box" id="dragSrcBox"></div>
       <div class="pan-hint" id="panHint">Middle-drag to pan · ⊡ Fit to recenter</div>
     </div>
   </main>
@@ -878,6 +892,8 @@ function stripEditorChrome(root){
     b.classList.remove("selected","connecting","highlight");
     if(!b.getAttribute("class")) b.removeAttribute("class");
     b.removeAttribute("contenteditable");
+    b.removeAttribute("draggable");                       // editor-only attribute
+    if(b.getAttribute("style")==="") b.removeAttribute("style");
   });
 }
 
@@ -905,15 +921,14 @@ function decorateBlocks(paper){
       if(connectMode.active){ ev.stopPropagation(); completeConnect(b); return; }
       ev.stopPropagation(); selectBlock(b);
     });
-    // text editing
-    if(isTextBlock(b)){
-      b.addEventListener("dblclick", ()=>{ b.setAttribute("contenteditable","true"); b.focus(); });
-      b.addEventListener("blur", ()=>{ b.removeAttribute("contenteditable"); commitInlineEdit(b); });
-    }
-    // draggable for reordering
+    // text editing (draggable is switched off while editing so text can be selected)
     b.setAttribute("draggable","true");
-    b.addEventListener("dragstart", ev=>onBlockDragStart(ev,b));
-    b.addEventListener("dragend", onBlockDragEnd);
+    if(isTextBlock(b)){
+      b.addEventListener("dblclick", ()=>{ b.setAttribute("draggable","false"); b.setAttribute("contenteditable","true"); b.focus(); });
+      b.addEventListener("blur", ()=>{ b.removeAttribute("contenteditable"); b.setAttribute("draggable","true"); commitInlineEdit(b); });
+    }
+    // NOTE: drag start/end are handled once, by delegation on the paper (setupCanvasDrop).
+    // Per-block listeners bubbled, so the OUTERMOST block ended up being dragged.
   });
 }
 
@@ -932,7 +947,7 @@ function selectBlock(b){
 function commitInlineEdit(b){
   // strip chrome nodes that may be inside after editing, then sync
   $$("[data-chrome]", b).forEach(n=>{ /* keep—will be removed on sync */ });
-  snapshot(); syncHtmlFromPaper(); persist(); updateRawFromState(); updateHealth();
+  syncHtmlFromPaper(); snapshot(); persist(); updateRawFromState(); updateHealth();
   // try to reflect edited text back into profile if bound
   reflectDomToProfile(b);
 }
@@ -1034,21 +1049,23 @@ function applyStyleToDom(paper){
    BLOCK OPERATIONS
    ================================================================ */
 function moveBlock(b, dir){
-  const parent=b.parentNode;
-  if(dir<0 && b.previousElementSibling) parent.insertBefore(b, b.previousElementSibling);
-  else if(dir>0 && b.nextElementSibling) parent.insertBefore(b.nextElementSibling, b);
-  afterStructureChange();
+  const paper=$("#paper"); const u=movableUnit(b,paper); const p=u.parentElement; if(!p) return;
+  const sibs=contentChildren(p); const j=sibs.indexOf(u)+dir;
+  if(j<0 || j>=sibs.length){ toast(dir<0?"Already first":"Already last"); return; }
+  if(dir<0) sibs[j].before(u); else sibs[j].after(u);
+  commitStructure(b);
 }
 function duplicateBlock(b){
-  const clone=b.cloneNode(true);
+  const paper=$("#paper"); const u=movableUnit(b,paper);
+  const clone=u.cloneNode(true);
   $$("[data-chrome]", clone).forEach(n=>n.remove());
   clone.classList.remove("selected");
-  b.parentNode.insertBefore(clone, b.nextElementSibling);
+  u.after(clone);
   afterStructureChange();
 }
 function deleteBlock(b){ const p=b.parentNode; b.remove(); selectedBlock=null; openInspectorFor(null); afterStructureChange(); }
 
-function afterStructureChange(){ snapshot(); syncHtmlFromPaper(); renderCanvas(); persist(); }
+function afterStructureChange(){ syncHtmlFromPaper(); snapshot(); renderCanvas(); persist(); }
 
 /* ================================================================
    INIT & top-level render
@@ -1164,6 +1181,14 @@ function renderFields(){
   updateConnCount();
 }
 
+/* a profile-field edit must reach the design AND the saved html (not just the DOM) */
+const commitFieldEdit=debounce(function(){
+  renderCanvas();            // profile -> DOM
+  syncHtmlFromPaper();       // DOM -> state.html, so the change is part of the saved design
+  updateRawFromState();
+  snapshot(); persist();
+},250);
+
 /* build one connectable box. isIcon=false => text/value box; isIcon=true => icon box
    The icon box binds a separate role "<key>__icon" to an <img> in the design. */
 function buildFieldBox(def, isIcon){
@@ -1191,19 +1216,34 @@ function buildFieldBox(def, isIcon){
   wrap.appendChild(head);
 
   // value / icon-url input
-  let input;
-  const curVal = isIcon ? (state.lineIcons[def.key]||iconSrcFromDom(roleKey)||"")
-                        : (def.custom ? (state.customFields.find(f=>f.key===def.key)||{}).value : state.profile[def.key]);
-  input=el("input",{type:isIcon?"url":(def.type==="email"?"email":def.type==="url"?"url":"text"), placeholder:isIcon?"icon image URL":"value", value:esc(curVal||"")});
+  const isImg = !isIcon && def.type==="image";
+  let curVal = isIcon ? (state.lineIcons[def.key]||iconSrcFromDom(roleKey)||"")
+                      : (def.custom ? (state.customFields.find(f=>f.key===def.key)||{}).value : state.profile[def.key]);
+  if(isImg && !curVal) curVal = iconSrcFromDom(roleKey) || "";    // linked image: read the URL from the design
+  const input=el("input",{type:(isIcon||isImg)?"url":(def.type==="email"?"email":def.type==="url"?"url":"text"),
+    placeholder:isImg?"https://… image URL":(isIcon?"icon image URL":"value"), value:curVal||""});
   input.className="cfield-input";
-  input.style.display = (curVal) ? "block" : "none";
+  let holder=input, setPrev=()=>{};
+  if(isImg){
+    // thumbnail + URL on one row; always visible when the image is linked, so the URL can be changed right here
+    const pv=el("div",{class:"imgprev",title:"Preview"}); const im=el("img",{alt:""});
+    im.addEventListener("error",()=>pv.classList.add("bad")); im.addEventListener("load",()=>pv.classList.remove("bad"));
+    pv.appendChild(im);
+    setPrev=v=>{ pv.classList.remove("bad"); if(v) im.setAttribute("src",v); else im.removeAttribute("src"); };
+    setPrev(curVal);
+    holder=el("div",{class:"imgrow"}); holder.appendChild(pv); holder.appendChild(input);
+  }
+  holder.style.display = (curVal || (isImg && bound)) ? (isImg?"flex":"block") : "none";
   input.addEventListener("input",()=>{
-    if(isIcon){ setIconForRole(def.key, input.value); }
-    else if(def.custom){ const f=state.customFields.find(x=>x.key===def.key); if(f) f.value=input.value; snapshot(); renderCanvas(); persist(); }
-    else { state.profile[def.key]=input.value; snapshot(); renderCanvas(); persist(); }
+    if(isIcon){ setIconForRole(def.key, input.value); return; }
+    const v = isImg ? input.value.trim() : input.value;
+    if(def.custom){ const f=state.customFields.find(x=>x.key===def.key); if(f) f.value=v; }
+    else state.profile[def.key]=v;
+    if(isImg) setPrev(v);
+    commitFieldEdit();            // profile -> design -> saved html (debounced)
   });
-  editBtn.addEventListener("click",()=>{ input.style.display = input.style.display==="none"?"block":"none"; if(input.style.display==="block") input.focus(); });
-  wrap.appendChild(input);
+  editBtn.addEventListener("click",()=>{ const shown=holder.style.display!=="none"; holder.style.display = shown?"none":(isImg?"flex":"block"); if(!shown) input.focus(); });
+  wrap.appendChild(holder);
 
   // hover highlight both ways
   wrap.addEventListener("mouseenter",()=>highlightRole(roleKey,true));
@@ -1332,7 +1372,7 @@ function renderSocials(){
     Object.keys(SOCIAL_TYPES).concat(["custom"]).forEach(t=>{ const o=el("option",{value:t}, t==="custom"?"Custom":SOCIAL_TYPES[t].label); if(t===l.type)o.setAttribute("selected",""); sel.appendChild(o); });
     sel.value=l.type;
     const rm=el("button",{class:"btn ghost small", style:"flex:0 0 auto;"},"×");
-    const url=el("input",{class:"ic-url",type:"text", placeholder:"profile URL", value:esc(l.url||"")});
+    const url=el("input",{class:"ic-url",type:"text", placeholder:"profile URL", value:l.url||""});
     const refreshPrev=()=>{ const u=socialIconFor(l); prev.className="ic-prev"+(u?"":" empty"); prev.innerHTML=u?`<img src="${esc(u)}">`:"?"; };
     sel.addEventListener("change",()=>{ l.type=sel.value; if(l.type!=="custom") delete l.icon; refreshPrev(); renderSocialCustomRow(); snapshot(); renderCanvas(); persist(); });
     url.addEventListener("input",()=>{ l.url=url.value;
@@ -1346,11 +1386,11 @@ function renderSocials(){
     // icon-image URL row — available for ANY type (override the default icon),
     // plus drag-to-connect: drop an icon element from the design onto this row
     const custWrap=el("div",{style:"flex-basis:100%;"});
-    const ci=el("input",{type:"url",placeholder:"icon image URL (optional override)",value:esc(l.icon||""),style:"margin-top:6px;"});
+    const ci=el("input",{type:"url",placeholder:"icon image URL (optional override)",value:l.icon||"",style:"margin-top:6px;"});
     ci.addEventListener("input",()=>{ l.icon=ci.value; refreshPrev(); snapshot(); renderCanvas(); persist(); });
     custWrap.appendChild(ci);
     if(l.type==="custom"){
-      const lbl=el("input",{type:"text",placeholder:"text label (if no icon)",value:esc(l.label||""),style:"margin-top:6px;"});
+      const lbl=el("input",{type:"text",placeholder:"text label (if no icon)",value:l.label||"",style:"margin-top:6px;"});
       lbl.addEventListener("input",()=>{ l.label=lbl.value; snapshot(); renderCanvas(); persist(); });
       custWrap.appendChild(lbl);
     }
@@ -1618,14 +1658,23 @@ function smartHref(v, role){
 /* a labeled text input row */
 function textFieldRow(host, label, value, onInput){
   const f=el("div",{class:"field"}); f.appendChild(el("label",null,label));
-  const i=el("input",{type:"text", value:esc(value||"")});
+  const i=el("input",{type:"text", value:value||""});
   i.addEventListener("input",()=>onInput(i.value));
   f.appendChild(i); host.appendChild(f); return i;
 }
 
 /* image inspector: url, width slider, radius, link-wrap */
 function imageInspector(host, img){
-  textFieldRow(host,"Image URL", img.getAttribute("src")||"", v=>{ img.setAttribute("src",v); scheduleSyncInspector(); });
+  textFieldRow(host,"Image URL", img.getAttribute("src")||"", v=>{
+    img.setAttribute("src",v);
+    // keep the linked profile field in step, otherwise applyProfileToDom() restores the old URL
+    const role=img.getAttribute("data-sig-role");
+    if(role){
+      if(ROLE_BY_KEY[role] && ROLE_BY_KEY[role].type==="image") state.profile[role]=v;
+      const cf=(state.customFields||[]).find(f=>f.key===role && f.type==="image"); if(cf) cf.value=v;
+    }
+    scheduleSyncInspector();
+  });
   const w=parseInt(img.getAttribute("width")||img.offsetWidth)||120;
   host.appendChild(sliderInline("Width","imgW",20,600,Math.min(600,w),"px",v=>{ img.setAttribute("width",v); img.style.width=v+"px"; img.style.height="auto"; scheduleSyncInspector(); }));
   const curR=parseInt((img.style.borderRadius||"0"))||0;
@@ -1686,7 +1735,7 @@ function lineIconControl(host, role){
   presetSel.appendChild(el("option",{value:""},"No icon"));
   Object.keys(LINE_ICON_SET).forEach(k=>{ const o=el("option",{value:LINE_ICON_SET[k]},"Icon: "+k); if(state.lineIcons[role]===LINE_ICON_SET[k])o.setAttribute("selected",""); presetSel.appendChild(o); });
   presetSel.appendChild(el("option",{value:"__custom"},"Custom URL…"));
-  const urlIn=el("input",{class:"ic-url",type:"url",placeholder:"icon image URL",value:esc(state.lineIcons[role]||"")});
+  const urlIn=el("input",{class:"ic-url",type:"url",placeholder:"icon image URL",value:state.lineIcons[role]||""});
   const setIcon=(u)=>{ if(u){ state.lineIcons[role]=u; prev.className="ic-prev"; prev.innerHTML=`<img src="${esc(u)}">`; } else { delete state.lineIcons[role]; prev.className="ic-prev empty"; prev.textContent="—"; } snapshot(); renderCanvas(); persist(); };
   presetSel.addEventListener("change",()=>{ if(presetSel.value==="__custom"){ urlIn.focus(); } else { urlIn.value=presetSel.value; setIcon(presetSel.value); } });
   urlIn.addEventListener("input",()=>setIcon(urlIn.value));
@@ -1698,12 +1747,12 @@ function sliderInline(label,id,min,max,val,unit,cb){
   r.addEventListener("input",()=>{ v.textContent=r.value+unit; cb(Number(r.value)); });
   row.appendChild(r); row.appendChild(v); wrap.appendChild(row); return wrap;
 }
-const scheduleSyncInspector=debounce(()=>{ snapshot(); syncHtmlFromPaper(); applyProfileToDom($("#paper")); updateRawFromState(); updateHealth(); persist(); },250);
+const scheduleSyncInspector=debounce(()=>{ applyProfileToDom($("#paper")); syncHtmlFromPaper(); snapshot(); updateRawFromState(); updateHealth(); persist(); renderFields(); },250);
 
 /* ================================================================
    DRAG & DROP — palette add + block reorder + resize
    ================================================================ */
-let dragKind=null, draggedBlock=null, dropLine=null;
+let dragKind=null, draggedBlock=null, draggedUnit=null, dropLine=null;
 
 function newBlockHtml(kind){
   const s=S();
@@ -1724,63 +1773,203 @@ function newBlockHtml(kind){
 
 function setupPaletteDrag(){
   $$(".pal-item[data-add]").forEach(item=>{
-    item.addEventListener("dragstart",ev=>{ dragKind="palette"; ev.dataTransfer.setData("text/plain", item.getAttribute("data-add")); ev.dataTransfer.effectAllowed="copy"; });
-    item.addEventListener("dragend",()=>{ dragKind=null; removeDropLine(); });
+    item.addEventListener("dragstart",ev=>{ dragKind="palette"; draggedBlock=null; draggedUnit=null; ev.dataTransfer.setData("text/plain", item.getAttribute("data-add")); ev.dataTransfer.effectAllowed="copy"; });
+    item.addEventListener("dragend",()=>{ resetDrag(); });
   });
 }
 
-function onBlockDragStart(ev,b){
-  dragKind="block"; draggedBlock=b; ev.dataTransfer.effectAllowed="move";
-  try{ ev.dataTransfer.setData("text/plain","__block__"); }catch(e){}
-  setTimeout(()=>b.style.opacity="0.4",0);
+/* ================================================================
+   STRUCTURE-SAFE DRAG & DROP
+   Rules that keep the layout predictable:
+   1. We never move a raw leaf. We move the "movable unit" (movableUnit):
+      the whole text line / image / table that owns its own spacing.
+      <td> / <tr> / <li> are RIGID: they only reorder among their siblings
+      (columns swap inside a row, rows reorder inside a table), so colspans,
+      cell padding and table geometry never break.
+   2. Free items (lines, images, tables, palette blocks) can be dropped into
+      any real container (td, div, signature root) - never into a text line.
+   3. The insertion marker is a fixed overlay, NOT a DOM node, so nothing
+      shifts while dragging (the old in-DOM marker caused the jumping).
+   4. Hold Shift while starting a drag to move the PARENT (e.g. the whole row).
+   ================================================================ */
+function contentChildren(p){
+  return Array.from(p.children).filter(c=>!c.hasAttribute("data-chrome") && !c.classList.contains("sig-line-icon"));
 }
-function onBlockDragEnd(){ if(draggedBlock) draggedBlock.style.opacity=""; removeDropLine(); dragKind=null; }
-
-function removeDropLine(){ if(dropLine){ dropLine.remove(); dropLine=null; } }
-function showDropLineAt(target, after){
-  removeDropLine();
-  dropLine=el("div",{class:"drop-line","data-chrome":"1"});
-  if(after) target.after(dropLine); else target.before(dropLine);
+function hasOwnText(n){
+  return Array.from(n.childNodes).some(c=>c.nodeType===3 && c.textContent.trim()!=="");
 }
-
-/* find the block nearest to the cursor (any nesting level), and whether to
-   drop before or after it — enables reordering inside table columns too */
-function nearestDropTarget(paper, x, y){
-  const blocks=$$("[data-sig-block]",paper).filter(b=>b!==draggedBlock && !(draggedBlock&&draggedBlock.contains(b)));
-  let best=null, bestDist=Infinity, after=false;
-  for(const b of blocks){
-    const r=b.getBoundingClientRect();
-    if(r.width===0&&r.height===0) continue;
-    const cx=r.left+r.width/2, cy=r.top+r.height/2;
-    const d=Math.hypot(x-cx, y-cy);
-    if(d<bestDist){ bestDist=d; best=b; after=(y>cy); }
+function isInlineEl(n){
+  if(!n || n.nodeType!==1) return false;
+  return getComputedStyle(n).display.indexOf("inline")===0;
+}
+/* a container that may receive dropped items: td/th/div (or the signature root)
+   that holds real block content or is truly empty - never a text line */
+function isSlot(n, paper){
+  if(n===paper) return true;
+  if(!n || n.nodeType!==1 || n.hasAttribute("data-chrome")) return false;
+  if(!/^(TD|TH|DIV)$/.test(n.tagName)) return false;
+  if(hasOwnText(n)) return false;
+  const kids=contentChildren(n);
+  if(!kids.length) return n.textContent.trim()==="" && n.textContent.indexOf("\u00a0")<0;   // spacer/divider cells carry &nbsp; -> not a slot
+  return kids.some(k=>!isInlineEl(k));
+}
+/* the element that actually moves when the user grabs block `b` */
+function movableUnit(b, paper){
+  let u=b;
+  // inline pieces (a, span, b, inline img) belong to the line/cell that contains them
+  while(u.parentElement && u.parentElement!==paper && isInlineEl(u)) u=u.parentElement;
+  for(let i=0;i<10;i++){
+    const p=u.parentElement; if(!p || p===paper) break;
+    const t=u.tagName;
+    if(t==="TD" || t==="TH"){
+      if(contentChildren(p).length>1) break;            // real column: rigid, reorders in its row
+      u=p; continue;                                    // lone cell -> its row
+    }
+    if(t==="TR"){
+      if(contentChildren(p).length>1) break;            // real row: rigid, reorders in its table
+      const tbl=p.closest("table");                     // lone row -> the whole table
+      if(tbl && tbl!==paper && paper.contains(tbl)) u=tbl;
+      break;
+    }
+    // sole content of a table cell -> move the cell (keeps its padding/width with it)
+    if((p.tagName==="TD" || p.tagName==="TH") && contentChildren(p).length===1 && !hasOwnText(p)){ u=p; continue; }
+    break;
   }
-  return best?{block:best, after}:null;
+  return u;
 }
+/* Shift-drag: one level up (cell -> row -> table, line -> its cell/container) */
+function liftUnit(u, paper){
+  const p=u.parentElement; if(!p || p===paper) return u;
+  if(u.tagName==="TR"){ const tbl=u.closest("table"); return (tbl && tbl!==paper && paper.contains(tbl)) ? movableUnit(tbl,paper) : u; }
+  return movableUnit(p,paper);
+}
+
+/* where would the dragged thing land? -> {parent, before, horiz} or null */
+function computeDrop(ev, paper){
+  const unit = dragKind==="block" ? draggedUnit : null;
+  let t=ev.target; if(!t || t.nodeType!==1 || !paper.contains(t)) return null;
+  // rigid items: only reorder inside their own parent
+  if(unit && /^(TD|TH|TR|LI)$/.test(unit.tagName)){
+    const parent=unit.parentElement; if(!parent) return null;
+    const horiz=(unit.tagName==="TD" || unit.tagName==="TH");
+    const pr=parent.getBoundingClientRect(), pad=28;
+    if(ev.clientX<pr.left-pad || ev.clientX>pr.right+pad || ev.clientY<pr.top-pad || ev.clientY>pr.bottom+pad) return null;
+    let before=null;
+    for(const sb of contentChildren(parent)){
+      if(sb===unit) continue;
+      const r=sb.getBoundingClientRect();
+      const mid = horiz ? r.left+r.width/2 : r.top+r.height/2;
+      if((horiz?ev.clientX:ev.clientY) < mid){ before=sb; break; }
+    }
+    return { parent, before, horiz };
+  }
+  // free items: nearest real container under the pointer
+  let c=t;
+  while(c && c!==paper){
+    const ch=c.closest("[data-chrome]"); if(ch){ c=ch.parentElement; continue; }
+    if(!(unit && unit.contains(c)) && isSlot(c,paper)) break;
+    c=c.parentElement;
+  }
+  const slot=(c && c!==paper) ? c : paper;
+  let before=null;
+  for(const k of contentChildren(slot)){
+    if(k===unit) continue;
+    const r=k.getBoundingClientRect(); if(r.width===0 && r.height===0) continue;
+    if(ev.clientY < r.top+r.height/2){ before=k; break; }
+  }
+  return { parent:slot, before, horiz:false };
+}
+
+function drawDropIndicator(d){
+  const ind=$("#dropIndicator"); if(!ind) return;
+  if(!d){ ind.classList.remove("show"); return; }
+  const kids=contentChildren(d.parent).filter(k=>k!==draggedUnit);
+  const ref=d.before || kids[kids.length-1];
+  const pr=d.parent.getBoundingClientRect();
+  let x,y,w,h;
+  if(d.horiz){
+    if(!ref){ ind.classList.remove("show"); return; }
+    const rr=ref.getBoundingClientRect();
+    x=(d.before?rr.left:rr.right)-1.5; y=pr.top; w=3; h=pr.height;
+  } else {
+    if(ref){ const rr=ref.getBoundingClientRect(); y=(d.before?rr.top:rr.bottom)-1.5; }
+    else y=pr.top+2;
+    x=pr.left; w=pr.width; h=3;
+  }
+  ind.style.left=x+"px"; ind.style.top=y+"px"; ind.style.width=w+"px"; ind.style.height=h+"px";
+  ind.classList.add("show");
+}
+function showSrcBox(u){
+  const b=$("#dragSrcBox"); if(!b || !u) return;
+  const r=u.getBoundingClientRect();
+  b.style.left=(r.left-2)+"px"; b.style.top=(r.top-2)+"px"; b.style.width=(r.width+4)+"px"; b.style.height=(r.height+4)+"px";
+  b.classList.add("show");
+}
+function hideDropUi(){
+  const i=$("#dropIndicator"); if(i) i.classList.remove("show");
+  const b=$("#dragSrcBox"); if(b) b.classList.remove("show");
+}
+function resetDrag(){ dragKind=null; draggedBlock=null; draggedUnit=null; hideDropUi(); }
+function removeDropLine(){ hideDropUi(); }   // legacy name
+
+/* position of a node among content children, from the signature root (survives re-render) */
+function elPath(node, root){
+  const path=[]; let n=node;
+  while(n && n!==root){ const p=n.parentElement; if(!p) return null; path.unshift(contentChildren(p).indexOf(n)); n=p; }
+  return path;
+}
+function elAtPath(root, path){
+  let n=root; for(const i of path){ n=contentChildren(n)[i]; if(!n) return null; } return n;
+}
+/* persist a structural change and keep the moved element selected */
+function commitStructure(node){
+  const path=node ? elPath(node,$("#paper")) : null;
+  afterStructureChange();
+  if(!path || path.indexOf(-1)>=0) return;
+  const n=elAtPath($("#paper"), path); if(!n) return;
+  const b=n.hasAttribute("data-sig-block") ? n : (n.querySelector("[data-sig-block]") || n.closest("[data-sig-block]"));
+  if(b){ $$("[data-sig-block].selected",$("#paper")).forEach(x=>x.classList.remove("selected")); b.classList.add("selected"); selectedBlock=b; openInspectorFor(b); }
+}
+
 function setupCanvasDrop(){
   const paper=$("#paper");
+  // ONE delegated dragstart: ev.target is the innermost draggable block
+  paper.addEventListener("dragstart",ev=>{
+    const t=ev.target; if(!t || t.nodeType!==1) return;
+    const b=t.closest("[data-sig-block]"); if(!b || !paper.contains(b)) return;
+    dragKind="block"; draggedBlock=b;
+    let u=movableUnit(b,paper); if(ev.shiftKey) u=liftUnit(u,paper);
+    draggedUnit=u;
+    ev.dataTransfer.effectAllowed="move";
+    try{ ev.dataTransfer.setData("text/plain","__block__"); }catch(e){}
+    showSrcBox(u);
+  });
+  paper.addEventListener("dragend",resetDrag);
   paper.addEventListener("dragover",ev=>{
     if(dragKind!=="palette" && dragKind!=="block") return;
-    ev.preventDefault(); ev.dataTransfer.dropEffect = dragKind==="palette"?"copy":"move";
-    const t=nearestDropTarget(paper, ev.clientX, ev.clientY);
-    if(t){ showDropLineAt(t.block, t.after); }
-    else { removeDropLine(); dropLine=el("div",{class:"drop-line","data-chrome":"1"}); paper.appendChild(dropLine); }
+    if(dragKind==="block" && !(draggedUnit && paper.contains(draggedUnit))) return;   // stale drag
+    const d=computeDrop(ev,paper);
+    if(!d){ drawDropIndicator(null); ev.dataTransfer.dropEffect="none"; return; }      // no preventDefault -> drop not allowed here
+    ev.preventDefault(); ev.dataTransfer.dropEffect = dragKind==="palette" ? "copy" : "move";
+    drawDropIndicator(d);
   });
-  paper.addEventListener("dragleave",ev=>{ if(ev.target===paper) removeDropLine(); });
+  paper.addEventListener("dragleave",ev=>{ if(!ev.relatedTarget || !paper.contains(ev.relatedTarget)) drawDropIndicator(null); });
   paper.addEventListener("drop",ev=>{
     if(dragKind!=="palette" && dragKind!=="block") return;
     ev.preventDefault();
-    const ref=dropLine;
-    if(dragKind==="palette"){
-      const kind=ev.dataTransfer.getData("text/plain");
-      const tmp=el("div",null,newBlockHtml(kind));
-      const node=tmp.firstElementChild;
-      if(ref&&ref.parentNode){ ref.replaceWith(node); } else paper.appendChild(node);
-    } else if(dragKind==="block" && draggedBlock){
-      if(ref&&ref.parentNode){ ref.replaceWith(draggedBlock); } else paper.appendChild(draggedBlock);
-      draggedBlock.style.opacity="";
+    const kind=dragKind, unit=draggedUnit, blk=draggedBlock;
+    const d=(kind==="block" && !(unit && paper.contains(unit))) ? null : computeDrop(ev,paper);
+    let moved=null;
+    if(d){
+      if(kind==="palette"){
+        const node=el("div",null,newBlockHtml(ev.dataTransfer.getData("text/plain"))).firstElementChild;
+        if(node){ d.parent.insertBefore(node,d.before); moved=node; }
+      } else if(!unit.contains(d.parent)){
+        d.parent.insertBefore(unit,d.before); moved=blk||unit;
+      }
     }
-    removeDropLine(); afterStructureChange();
+    resetDrag();
+    if(moved) commitStructure(moved);
   });
 }
 
@@ -2374,12 +2563,12 @@ function renderReviewSocials(){
     const sel=el("select",{style:"flex:0 0 92px;"});
     Object.keys(SOCIAL_TYPES).concat(["custom"]).forEach(t=>{ const o=el("option",{value:t}, t==="custom"?"Custom":SOCIAL_TYPES[t].label); if(t===l.type)o.setAttribute("selected",""); sel.appendChild(o); });
     sel.value=l.type;
-    const url=el("input",{class:"ic-url",type:"text",placeholder:"URL",value:esc(l.url||"")});
+    const url=el("input",{class:"ic-url",type:"text",placeholder:"URL",value:l.url||""});
     const refresh=()=>{ const u=socialIconFor(l); prev.className="ic-prev"+(u?"":" empty"); prev.innerHTML=u?`<img src="${esc(u)}">`:"?"; };
     sel.addEventListener("change",()=>{ l.type=sel.value; if(l.type!=="custom") delete l.icon; refresh(); snapshot(); renderCanvas(); persist(); });
     url.addEventListener("input",()=>{ l.url=url.value; snapshot(); renderCanvas(); persist(); });
     wrap.appendChild(prev); wrap.appendChild(sel); wrap.appendChild(url);
-    const ci=el("input",{type:"url",placeholder:"icon image URL — or drag an icon here",value:esc(l.icon||""),style:"flex-basis:100%;margin-top:6px;"});
+    const ci=el("input",{type:"url",placeholder:"icon image URL — or drag an icon here",value:l.icon||"",style:"flex-basis:100%;margin-top:6px;"});
     ci.addEventListener("input",()=>{ l.icon=ci.value; refresh(); snapshot(); renderCanvas(); persist(); });
     wrap.appendChild(ci);
     wrap.addEventListener("dragover",ev=>{ if(reviewDragEl||draggedBlock){ ev.preventDefault(); wrap.classList.add("droptarget"); } });
